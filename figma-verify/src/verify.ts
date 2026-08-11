@@ -1,0 +1,86 @@
+import { mergeTolerances, type Tolerances } from "./config.js";
+import { fetchFigmaNode, type FigmaNode } from "./figma/client.js";
+import { normalizeFigmaTree } from "./figma/normalize.js";
+import { parseFigmaUrl } from "./figma/url.js";
+import { extractFromUrl } from "./web/extract.js";
+import { matchElements } from "./match/matcher.js";
+import { diffMatches } from "./diff/diff.js";
+import { renderMarkdown } from "./report/render.js";
+import type { DriftReport, NormalizedElement } from "./types.js";
+
+export interface VerifyOptions {
+  figmaUrl: string;
+  liveUrl: string;
+  viewportWidth?: number;
+  tolerances?: Partial<Tolerances>;
+}
+
+export interface VerifyOutput {
+  markdown: string;
+  report: DriftReport;
+}
+
+/**
+ * Full pipeline: Figma spec + live DOM -> match -> diff -> report.
+ */
+export async function verifyImplementation(options: VerifyOptions): Promise<VerifyOutput> {
+  const ref = parseFigmaUrl(options.figmaUrl);
+  const rootNode = await fetchFigmaNode(ref);
+  const design = normalizeFigmaTree(rootNode);
+
+  const frame = design[0];
+  if (!frame) throw new Error("Design frame normalized to zero elements.");
+
+  const viewportWidth = options.viewportWidth ?? Math.round(frame.bounds.w);
+  const dom = await extractFromUrl(options.liveUrl, viewportWidth);
+
+  return runComparison(rootNode.name, design, dom, {
+    viewportWidth,
+    figmaUrl: options.figmaUrl,
+    liveUrl: options.liveUrl,
+    tolerances: options.tolerances,
+  });
+}
+
+/**
+ * Pure comparison stage, separated so tests and the CLI can run it against
+ * fixtures without network or a browser.
+ */
+export function runComparison(
+  frameName: string,
+  design: NormalizedElement[],
+  dom: NormalizedElement[],
+  opts: {
+    viewportWidth: number;
+    figmaUrl?: string;
+    liveUrl?: string;
+    tolerances?: Partial<Tolerances>;
+  }
+): VerifyOutput {
+  const tolerances = mergeTolerances(opts.tolerances);
+  // Skip the root frame itself (index 0) for matching noise; compare children.
+  const matches = matchElements(design.slice(1), dom, tolerances.iouFloor);
+  const report = diffMatches(design.slice(1), dom, matches, tolerances, {
+    frameName,
+    viewportWidth: opts.viewportWidth,
+    figmaUrl: opts.figmaUrl,
+    liveUrl: opts.liveUrl,
+  });
+  return { markdown: renderMarkdown(report), report };
+}
+
+/**
+ * Fetch and normalize just the design spec (no browser).
+ */
+export async function getDesignSpec(figmaUrl: string): Promise<{
+  frameName: string;
+  frameWidth: number;
+  elements: NormalizedElement[];
+}> {
+  const ref = parseFigmaUrl(figmaUrl);
+  const rootNode: FigmaNode = await fetchFigmaNode(ref);
+  const elements = normalizeFigmaTree(rootNode);
+  const frame = elements[0];
+  if (!frame) throw new Error("Design frame normalized to zero elements.");
+  return { frameName: rootNode.name, frameWidth: frame.bounds.w, elements };
+}

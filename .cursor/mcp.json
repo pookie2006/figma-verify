@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "figma-verify": {
+      "command": "node",
+      "args": ["/Users/pooja/Downloads/Figma Projects/figma-verify/dist/index.js"],
+      "env": {
+        "FIGMA_TOKEN": "PASTE_YOUR_FIGMA_TOKEN_HERE"
+      }
+    }
+  }
+}
