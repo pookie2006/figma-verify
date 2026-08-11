@@ -2,7 +2,9 @@
 
 **An MCP server that lets AI agents check their code against the Figma design — and self-correct until it's pixel-perfect.**
 
-**🔗 Live demo:** [pookie2006.github.io/figma-verify](https://pookie2006.github.io/figma-verify/) — the interactive drift report, the flawed implementation it's scoring, and a pixel-faithful reference build, all regenerated on every push (see [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml)).
+**🔗 Live demo:** [pookie2006.github.io/figma-verify](https://pookie2006.github.io/figma-verify/) — the interactive drift report, the flawed implementation it's scoring, and a pixel-faithful reference build.
+
+> First-time setup: open [Settings → Pages](https://github.com/pookie2006/figma-verify/settings/pages) and either set Source to **GitHub Actions**, *or* set Source to **Deploy from a branch** → `main` → `/docs`. Until that toggle is flipped once, the `github.io` URL returns 404.
 
 Figma's MCP server pushes design context *into* agents, and agents generate code from it. But nothing closes the loop: no tool lets the agent **verify** that the implementation actually matches the design. Figma Verify closes that loop — the agent implements, verifies, reads the drift report, fixes its code, and re-runs until the fidelity score is 100.
 

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Signup Card — deliberately flawed demo</title>
+<style>
+  /*
+   * Deliberately flawed implementation of the "Signup Card" Figma frame.
+   * Planted flaws for figma-verify to catch:
+   *   1. Wrong brand color on the button (#7c3aed instead of #4f46e5)
+   *   2. Wrong title font size (20px instead of 24px)
+   *   3. Missing element (the guarantee badge is not implemented)
+   *   4. Wrong card padding (24px instead of 32px)
+   *   5. Wrong card border radius (8px instead of 16px)
+   */
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: #f8fafc;
+    font-family: Arial, sans-serif;
+    min-height: 100vh;
+  }
+  .card {
+    width: 400px;
+    margin: 120px auto 0;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;          /* flaw 5: design says 16px */
+    padding: 24px;               /* flaw 4: design says 32px */
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .title {
+    font: 700 20px/32px Arial;   /* flaw 2: design says 24px */
+    color: #0f172a;
+  }
+  .subtitle {
+    font: 400 15px/24px Arial;
+    color: #475569;
+  }
+  .button {
+    height: 48px;
+    background: #7c3aed;         /* flaw 1: design brand color is #4f46e5 */
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .button-label {
+    font: 600 16px/24px Arial;
+    color: #ffffff;
+    text-align: center;
+  }
+  .signin {
+    font: 400 14px/20px Arial;
+    color: #475569;
+  }
+  /* flaw 3: .badge (14-day money-back guarantee pill) was never implemented */
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="title">Create your account</div>
+    <div class="subtitle">Start your 30-day free trial.</div>
+    <div class="button">
+      <div class="button-label">Get started</div>
+    </div>
+    <div class="signin">Already have an account? Sign in</div>
+  </div>
+</body>
+</html>
