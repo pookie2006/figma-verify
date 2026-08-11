@@ -2,6 +2,8 @@
 
 **An MCP server that lets AI agents check their code against the design — and self-correct until it's pixel-perfect.**
 
+**🔗 Live demo:** [pookie2006.github.io/figma-verify](https://pookie2006.github.io/figma-verify/) — click around the report below without cloning anything.
+
 ## What recruiters should notice
 
 - **It closes a real loop, not just a diff.** The output isn't a report a human reads once — it's a ranked, root-cause-first, copy-pasteable prompt an agent can act on, then re-verify against, until the score is 100. See `src/report/instructions.ts` and the "Copy as agent prompt" button in the report.
@@ -213,6 +215,16 @@ Exit code 0 = fidelity 100, 1 = drift found, 2 = error.
 5. Wrong card border radius (8px instead of 16px) — **medium**
 
 Run the CLI as above and watch the report catch all five. Point an agent at the report and it fixes the page; re-run until the score is 100.
+
+## Deployment
+
+Every push to `main` that touches `figma-verify/` regenerates the demo report and publishes it to GitHub Pages via [`.github/workflows/deploy-pages.yml`](../.github/workflows/deploy-pages.yml) — no external hosting account or API token needed, since it uses GitHub's own `actions/deploy-pages`. The published site (`figma-verify/site/index.html` is the landing page) links to:
+
+- `report.html` — the interactive drift report
+- `demo-implementation.html` — the flawed page it's scoring
+- `design-reference.html` — a pixel-faithful reference build
+
+If the very first run fails with a "Pages is not enabled" error, flip one switch: repo **Settings → Pages → Build and deployment → Source: "GitHub Actions"**. You can also trigger a deploy manually from the **Actions** tab (`Deploy demo to GitHub Pages` → *Run workflow*) without waiting for a push to `main`.
 
 ## Tests
 

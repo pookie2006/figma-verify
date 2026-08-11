@@ -1,0 +1,68 @@
+name: Deploy demo to GitHub Pages
+
+# Regenerates the self-contained HTML report from the demo fixture and
+# publishes it (plus the flawed implementation and the pixel-perfect
+# reference build) to GitHub Pages. Requires no external credentials —
+# only the "pages: write" permission below, granted automatically to the
+# workflow's GITHUB_TOKEN.
+#
+# One-time setup (if the first run fails with a "Pages not enabled" error):
+# repo Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "figma-verify/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: figma-verify
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: figma-verify/package-lock.json
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run demo:report
+
+      - name: Assemble the static site
+        run: |
+          mkdir -p _site
+          cp site/index.html _site/index.html
+          cp demo/report.html _site/report.html
+          cp demo/index.html _site/demo-implementation.html
+          cp demo/design-reference.html _site/design-reference.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: figma-verify/_site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
