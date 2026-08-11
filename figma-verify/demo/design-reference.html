@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Signup Card — design reference (matches design-fixture.json)</title>
+<style>
+  /*
+   * Pixel-faithful rendering of the "Signup Card" frame recorded in
+   * design-fixture.json. This is what a correct implementation looks like:
+   * verifying it against the fixture scores 100/100.
+   */
+  * { box-sizing: border-box; margin: 0; }
+  body { background: #f8fafc; font-family: Arial, sans-serif; min-height: 100vh; }
+  .card {
+    width: 400px;
+    margin: 120px auto 0;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .title { font: 700 24px/32px Arial; color: #0f172a; }
+  .subtitle { font: 400 15px/24px Arial; color: #475569; }
+  .button {
+    height: 48px;
+    background: #4f46e5;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .button-label { font: 600 16px/24px Arial; color: #ffffff; text-align: center; }
+  .signin { font: 400 14px/20px Arial; color: #475569; }
+  .badge { background: #ecfdf5; border-radius: 14px; }
+  .badge-label { font: 600 13px/28px Arial; color: #047857; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="title">Create your account</div>
+    <div class="subtitle">Start your 30-day free trial.</div>
+    <div class="button"><div class="button-label">Get started</div></div>
+    <div class="signin">Already have an account? Sign in</div>
+    <div class="badge"><div class="badge-label">14-day money-back guarantee</div></div>
+  </div>
+</body>
+</html>
