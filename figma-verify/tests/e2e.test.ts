@@ -45,8 +45,8 @@ beforeAll(async () => {
   const design = normalizeFigmaTree(root);
   const width = Math.round(design[0]!.bounds.w);
 
-  const dom = await extractFromUrl(liveUrl, width);
-  output = runComparison(root.name, design, dom, { viewportWidth: width, liveUrl });
+  const { elements: dom, screenshotBase64 } = await extractFromUrl(liveUrl, width, design[0]!.bounds.h);
+  output = runComparison(root.name, design, dom, { viewportWidth: width, liveUrl, screenshotBase64 });
 }, 60_000);
 
 afterAll(() => {
@@ -109,6 +109,70 @@ describe("e2e: flawed demo vs design fixture", () => {
 
   it("scores well below 100 for the flawed page", () => {
     expect(output.report.fidelityScore).toBeLessThan(80);
+  });
+
+  it("computes all four scoring profiles", () => {
+    const { scores } = output.report;
+    expect(scores.balanced).toBe(output.report.fidelityScore); // default profile
+    expect(scores.strict).toBeLessThanOrEqual(40); // criticals present -> capped
+    expect(scores.perElement).toBeGreaterThan(0);
+    // Cascade discount: most mediums are fallout from the padding flaw.
+    expect(scores.rootCause).toBeGreaterThan(scores.balanced);
+  });
+
+  it("tags position drift caused by the card's padding flaw as cascades", () => {
+    const title = output.report.elements.find((e) => e.designName === "Title")!;
+    const xDiff = title.diffs.find((d) => d.property === "x")!;
+    expect(xDiff.cascade).toBe(true);
+    // The title's fontSize drift is a real flaw, not a cascade.
+    expect(title.diffs.find((d) => d.property === "fontSize")!.cascade).toBeUndefined();
+  });
+
+  it("generates agent fix instructions covering every planted flaw", () => {
+    const ins = output.report.fixInstructions;
+    const all = JSON.stringify(ins);
+
+    // Flaw 3: missing badge -> one create step with the full spec (child folded in).
+    const create = ins.find((i) => i.kind === "create")!;
+    expect(create.step).toBe(1);
+    expect(create.summary).toContain('"Guarantee Badge"');
+    expect(create.details.join("\n")).toContain("background-color: #ecfdf5");
+    expect(create.details.join("\n")).toContain('"14-day money-back guarantee"');
+
+    // Flaw 1 + 2: brand color and title font size as style steps.
+    expect(all).toContain("background-color: #4f46e5");
+    expect(all).toContain("font-size: 24px");
+
+    // Flaw 4 + 5: padding shorthand and radius in the card's layout step.
+    const layout = ins.find((i) => i.kind === "layout" && i.selector === "body > div.card")!;
+    expect(layout.details).toContainEqual(expect.stringContaining("padding: 32px"));
+    expect(layout.details).toContainEqual(expect.stringContaining("border-radius: 16px"));
+    expect(layout.note).toMatch(/resolves 15 cascade/);
+
+    // Cascade fallout on children must not become instructions; only the
+    // card's own height drift (root-level, unattributable) may appear as a
+    // final geometry step with the re-verify caveat.
+    const geometry = ins.filter((i) => i.kind === "geometry");
+    expect(geometry.every((g) => g.selector === "body > div.card")).toBe(true);
+    for (const g of geometry) expect(g.note).toContain("Re-verify");
+    expect(geometry.length).toBeLessThanOrEqual(1);
+    expect(ins[ins.length - 1]!.kind === "geometry" || geometry.length === 0).toBe(true);
+
+    // And the markdown report carries the section.
+    expect(output.markdown).toContain("## Fix instructions (for the implementing agent)");
+  });
+
+  it("captures a screenshot and produces a self-contained HTML report", async () => {
+    expect(output.screenshotBase64).toBeTruthy();
+    const { renderHtmlReport } = await import("../src/report/render-html.js");
+    const html = renderHtmlReport({
+      report: output.report,
+      design: output.designElements,
+      screenshotBase64: output.screenshotBase64,
+    });
+    expect(html).toContain('id="fv-data"');
+    expect(html).toContain("data:image/png;base64,");
+    expect(/(src|href)=["']https?:/i.test(html)).toBe(false);
   });
 
   it("renders a markdown report with selector hints and severity labels", () => {

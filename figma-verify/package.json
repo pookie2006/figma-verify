@@ -18,7 +18,9 @@
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
-    "demo:serve": "npx serve demo -l 4173"
+    "demo:serve": "npx serve demo -l 4173",
+    "demo:report": "tsx src/cli.ts --fixture demo/design-fixture.json \"file://$PWD/demo/index.html\" --html demo/report.html || true",
+    "demo:open": "npm run demo:report --silent && node scripts/open-report.mjs demo/report.html"
   },
   "keywords": [
     "mcp",

@@ -6,18 +6,23 @@ import { extractFromUrl } from "./web/extract.js";
 import { matchElements } from "./match/matcher.js";
 import { diffMatches } from "./diff/diff.js";
 import { renderMarkdown } from "./report/render.js";
-import type { DriftReport, NormalizedElement } from "./types.js";
+import type { DriftReport, NormalizedElement, ScoringProfile } from "./types.js";
 
 export interface VerifyOptions {
   figmaUrl: string;
   liveUrl: string;
   viewportWidth?: number;
   tolerances?: Partial<Tolerances>;
+  scoringProfile?: ScoringProfile;
 }
 
 export interface VerifyOutput {
   markdown: string;
   report: DriftReport;
+  /** Full normalized design (including the root frame), for visual reports. */
+  designElements: NormalizedElement[];
+  /** PNG screenshot of the implementation, base64 (absent in fixture-only runs without a browser). */
+  screenshotBase64?: string;
 }
 
 /**
@@ -32,13 +37,19 @@ export async function verifyImplementation(options: VerifyOptions): Promise<Veri
   if (!frame) throw new Error("Design frame normalized to zero elements.");
 
   const viewportWidth = options.viewportWidth ?? Math.round(frame.bounds.w);
-  const dom = await extractFromUrl(options.liveUrl, viewportWidth);
+  const { elements: dom, screenshotBase64 } = await extractFromUrl(
+    options.liveUrl,
+    viewportWidth,
+    frame.bounds.h
+  );
 
   return runComparison(rootNode.name, design, dom, {
     viewportWidth,
     figmaUrl: options.figmaUrl,
     liveUrl: options.liveUrl,
     tolerances: options.tolerances,
+    scoringProfile: options.scoringProfile,
+    screenshotBase64,
   });
 }
 
@@ -55,6 +66,8 @@ export function runComparison(
     figmaUrl?: string;
     liveUrl?: string;
     tolerances?: Partial<Tolerances>;
+    scoringProfile?: ScoringProfile;
+    screenshotBase64?: string;
   }
 ): VerifyOutput {
   const tolerances = mergeTolerances(opts.tolerances);
@@ -65,8 +78,14 @@ export function runComparison(
     viewportWidth: opts.viewportWidth,
     figmaUrl: opts.figmaUrl,
     liveUrl: opts.liveUrl,
+    scoringProfile: opts.scoringProfile,
   });
-  return { markdown: renderMarkdown(report), report };
+  return {
+    markdown: renderMarkdown(report),
+    report,
+    designElements: design,
+    screenshotBase64: opts.screenshotBase64,
+  };
 }
 
 /**

@@ -1,5 +1,3 @@
-import type { Severity } from "./types.js";
-
 export interface Tolerances {
   /** Position and size tolerance in px. */
   position: number;
@@ -19,14 +17,6 @@ export const DEFAULT_TOLERANCES: Tolerances = {
   fontSize: 0.5,
   colorDistance: 8,
   iouFloor: 0.4,
-};
-
-/** Weighted deduction per issue when computing the fidelity score. */
-export const SEVERITY_DEDUCTIONS: Record<Severity, number> = {
-  critical: 15,
-  high: 5,
-  medium: 2,
-  low: 0.5,
 };
 
 export function getFigmaToken(): string {

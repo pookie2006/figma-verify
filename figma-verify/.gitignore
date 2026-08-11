@@ -3,3 +3,5 @@ dist/
 .env
 *.log
 .DS_Store
+demo/report.html
+_site/
