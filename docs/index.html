@@ -3,59 +3,1383 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Figma Verify — Live demo</title>
+<title>Figma Verify — Signup Card</title>
 <style>
-  :root { --accent: #0E7C7B; --accent-dark: #0A5F5E; --ink: #1A1B1E; --muted: #6B6E76; --border: #E1E1DE; }
-  * { box-sizing: border-box; }
-  body { margin: 0; font: 15px/1.6 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: var(--ink); background: #fff; }
-  main { max-width: 760px; margin: 0 auto; padding: 64px 20px 80px; }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; margin-bottom: 28px; }
-  .brand svg { flex-shrink: 0; }
-  h1 { font-size: 28px; margin: 0 0 12px; }
-  p.lede { color: var(--muted); font-size: 16px; margin: 0 0 36px; }
-  .card { display: block; border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; margin-bottom: 14px; text-decoration: none; color: inherit; transition: border-color .15s ease, box-shadow .15s ease; }
-  .card:hover { border-color: var(--accent); box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
-  .card .tag { display: inline-block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-dark); background: #E4F4F3; padding: 2px 8px; border-radius: 999px; margin-bottom: 8px; }
-  .card h2 { font-size: 17px; margin: 0 0 6px; }
-  .card p { margin: 0; color: var(--muted); font-size: 13.5px; }
-  footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
-  footer a { color: var(--accent-dark); }
-  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #F6F6F5; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 12.5px; }
+:root {
+  --critical: #F0472A; --high: #E8890C; --medium: #C99A02; --low: #8B5CF6; --clean: #12966B;
+  --critical-ink: #C3341C; --high-ink: #A8620A; --medium-ink: #8A6C00; --low-ink: #6D3FD6; --clean-ink: #0B7A56;
+  --accent: #0E7C7B; --accent-dark: #0A5F5E; --accent-tint: #E4F4F3;
+  --chrome: #FFFFFF; --chrome-2: #F6F6F5; --chrome-3: #ECECEA; --border: #E1E1DE; --canvas: #F1F1EE;
+  --ink: #1A1B1E; --muted: #6B6E76;
+  --font-ui: -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Roboto Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--chrome); color: var(--ink);
+  font: 13px/1.5 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* ---- toolbar ---- */
+#fv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 50px; padding: 6px 16px; background: var(--chrome); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+h1.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; font-family: var(--font-ui); }
+.brand-mark { flex-shrink: 0; color: var(--ink); }
+.inserters { display: flex; align-items: stretch; gap: 8px; flex: 1 1 320px; min-width: 0; }
+.inserter { display: flex; align-items: center; gap: 7px; min-width: 0; flex: 1; padding: 5px 10px; border: 1px dashed var(--border); border-radius: 8px; background: var(--chrome-2); cursor: pointer; }
+.inserter:hover, .inserter.has-file { border-style: solid; border-color: var(--accent); background: var(--accent-tint); }
+.inserter-ic { flex-shrink: 0; color: var(--muted); }
+.inserter.has-file .inserter-ic { color: var(--accent-dark); }
+.inserter-kicker { flex-shrink: 0; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.inserter-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--ink); font-weight: 500; }
+.meta { flex: 0 1 180px; min-width: 0; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta strong { color: var(--ink); font-family: var(--font-mono); font-weight: 600; }
+.meta .meta-sep { margin: 0 7px; color: var(--border); }
+.agent-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--accent-tint); color: var(--accent-dark); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; }
+.agent-chip::before { content: '\21bb'; font-size: 11px; }
+.tb-group { display: flex; align-items: center; gap: 2px; }
+.seg { background: var(--chrome-2); border-radius: 8px; padding: 2px; }
+.seg button { border: none; background: none; border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 500; color: var(--muted); cursor: pointer; }
+.seg button.active { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,0.12); font-weight: 600; }
+#fv-onion { gap: 6px; color: var(--muted); font-size: 12px; }
+#fv-onion input[type=range] { width: 96px; accent-color: var(--accent); }
+.zoom { background: var(--chrome-2); border-radius: 8px; padding: 2px; }
+.zoom button { border: none; background: none; border-radius: 6px; padding: 4px 8px; font-size: 12px; color: var(--ink); cursor: pointer; }
+.zoom button:hover { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.10); }
+#fv-zoom { min-width: 44px; text-align: center; font-size: 12px; font-family: var(--font-mono); color: var(--muted); }
+#fv-overlay-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; background: var(--chrome-2); border: 1px solid transparent; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+#fv-overlay-toggle .tog-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+#fv-overlay-toggle[aria-pressed="false"] { color: var(--muted); }
+#fv-overlay-toggle[aria-pressed="false"] .tog-dot { background: #C9C9C9; }
+.panel-toggle-btn { display: none; border: 1px solid var(--border); background: var(--chrome-2); border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: 500; cursor: pointer; }
+.panel-toggle-btn[aria-expanded="true"] { background: var(--accent-tint); border-color: var(--accent); color: var(--accent-dark); }
+
+/* ---- editor body ---- */
+#fv-editor { flex: 1; display: flex; min-height: 0; min-width: 0; }
+#fv-scrim { display: none; position: fixed; inset: 0; background: rgba(20,20,20,0.28); z-index: 25; }
+#fv-scrim.show { display: block; }
+
+/* ---- layers panel (right rail) ---- */
+#fv-layers { width: 248px; flex-shrink: 0; background: var(--chrome); border-left: 1px solid var(--border); display: flex; flex-direction: column; order: 3; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px 8px; font-size: 11px; font-weight: 700; color: var(--ink); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+.panel-close { display: none; border: none; background: none; color: var(--muted); font-size: 16px; cursor: pointer; line-height: 1; padding: 2px 4px; }
+#fv-tree { flex: 1; overflow-y: auto; padding: 4px 4px 12px; }
+.tree-row { display: flex; align-items: center; gap: 5px; height: 28px; padding: 0 8px 0 4px; border-radius: 5px; cursor: pointer; white-space: nowrap; }
+.tree-row:hover { background: var(--chrome-2); }
+.tree-row.selected { background: var(--accent-tint); }
+.tree-row.selected .tree-name { color: var(--accent-dark); font-weight: 600; }
+.tree-row .chev { width: 12px; flex-shrink: 0; color: var(--muted); font-size: 9px; text-align: center; cursor: pointer; }
+.tree-row .layer-ic { width: 14px; flex-shrink: 0; text-align: center; color: var(--muted); font-size: 10px; font-weight: 600; font-family: var(--font-mono); }
+.tree-row .layer-ic.ic-frame { position: relative; }
+.tree-row .layer-ic.ic-frame::before { content: ''; display: inline-block; width: 8px; height: 8px; border: 1.2px solid var(--muted); border-radius: 1px; }
+.tree-row .tree-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.tree-row .tree-name .missing-tag { color: var(--critical-ink); font-style: italic; font-weight: 600; }
+.tree-row .mk { min-width: 15px; height: 15px; padding: 0 3px; border-radius: 4px; font-size: 9.5px; font-weight: 700; font-family: var(--font-mono); line-height: 15px; text-align: center; color: #fff; flex-shrink: 0; }
+.tree-row .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.tree-kids.hidden { display: none; }
+
+/* ---- canvas ---- */
+#fv-canvas { flex: 1; min-width: 0; position: relative; overflow: hidden; background-color: var(--canvas); order: 2;
+  background-image: radial-gradient(#D7D7D3 1px, transparent 1.5px); background-size: 24px 24px; cursor: grab; }
+#fv-canvas.panning { cursor: grabbing; }
+#fv-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.frame-block { position: absolute; top: 0; }
+.frame-label { position: absolute; top: -24px; left: 0; right: 0; display: flex; justify-content: space-between; font-size: 11px; font-family: var(--font-mono); color: var(--accent-dark); font-weight: 500; white-space: nowrap; }
+.frame-label .impl-tag { color: var(--clean-ink); }
+.stage { position: relative; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.10); color: #17202b; }
+.stage img { display: block; }
+.fv-el { position: absolute; overflow: hidden; }
+body.mode-overlay #fv-impl-block .fv-ov, body.mode-overlay #fv-impl-block .fv-chip { display: none; }
+.mode-swipe .frame-label, .mode-overlay #fv-impl-block .frame-label { display: none; }
+
+/* markers */
+body.overlays-off .fv-ov, body.overlays-off .fv-chip, body.overlays-off #fv-ghost { display: none !important; }
+.fv-ov { position: absolute; border: 1.5px solid transparent; cursor: pointer; }
+.fv-ov.flt-hidden, .fv-chip.flt-hidden { display: none; }
+.fv-sev-critical { border-color: var(--critical); background: rgba(240,71,42,0.07); }
+.fv-sev-high { border-color: var(--high); background: rgba(232,137,12,0.07); }
+.fv-sev-medium { border-color: var(--medium); background: rgba(201,154,2,0.08); }
+.fv-sev-low { border-color: var(--low); background: rgba(139,92,246,0.06); }
+.fv-sev-clean { border-color: transparent; }
+.fv-sev-clean:hover { border-color: rgba(18,150,107,0.55); }
+.fv-missing { border-style: dashed; }
+.fv-ov.hovered { border-color: var(--accent); background: rgba(14,124,123,0.10); }
+.fv-ov.hovered::after { content: attr(data-name); position: absolute; left: -1.5px; top: -19px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 500; line-height: 15px; padding: 0 5px; border-radius: 2px; white-space: nowrap; }
+.fv-ov.selected { border-color: var(--accent); background: rgba(14,124,123,0.06); }
+.fv-ov .h { display: none; position: absolute; width: 7px; height: 7px; background: #fff; border: 1.2px solid var(--accent); }
+.fv-ov.selected .h { display: block; }
+.fv-ov .h.tl { left: -4px; top: -4px; } .fv-ov .h.tr { right: -4px; top: -4px; }
+.fv-ov .h.bl { left: -4px; bottom: -4px; } .fv-ov .h.br { right: -4px; bottom: -4px; }
+.fv-chip { position: absolute; z-index: 5; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 4px; color: #fff; font-size: 10px; font-weight: 700; font-family: var(--font-mono); line-height: 16px; text-align: center; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.25); }
+.fv-chip.chip-dark { color: #1A1B1E; }
+#fv-ghost { position: absolute; border: 1.5px dashed var(--critical); pointer-events: none; z-index: 6; }
+#fv-ghost .ghost-label { position: absolute; top: -19px; left: 0; background: var(--critical); color: #fff; font-size: 10px; font-family: var(--font-mono); font-weight: 600; line-height: 15px; padding: 0 5px; border-radius: 2px; white-space: nowrap; }
+#fv-swipe-handle { position: absolute; z-index: 10; width: 2px; background: var(--accent); cursor: ew-resize; }
+#fv-swipe-handle .grip { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 22px; height: 22px; border-radius: 50%; background: var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+#fv-swipe-handle .grip::before { content: '\2194'; display: block; color: #fff; text-align: center; line-height: 22px; font-size: 11px; }
+#fv-legend { position: absolute; bottom: 12px; left: 12px; display: flex; gap: 12px; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 11px; color: var(--muted); box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+#fv-legend .lg { display: flex; align-items: center; gap: 5px; }
+#fv-legend .sw { width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid; }
+
+/* ---- mobile score header (hidden ≥800px) ---- */
+#fv-mobile-topbar { display: none; align-items: center; gap: 10px; padding: 8px 14px; background: var(--chrome-2); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5; }
+#fv-mobile-topbar .m-grade { font-family: var(--font-mono); font-weight: 700; font-size: 12px; border: 1px solid var(--border); border-radius: 999px; width: 20px; height: 20px; line-height: 18px; text-align: center; background: #fff; flex-shrink: 0; }
+#fv-mobile-topbar .m-score { font-family: var(--font-mono); font-weight: 700; font-size: 18px; flex-shrink: 0; }
+#fv-mobile-topbar .m-score::after { content: '/100'; font-size: 11px; font-weight: 500; color: var(--muted); }
+#fv-mobile-topbar .m-companion { flex: 1; min-width: 0; font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- inspect / score panel (left rail) ---- */
+#fv-inspect { width: 288px; flex-shrink: 0; background: var(--chrome); border-right: 1px solid var(--border); overflow-y: auto; order: 1; }
+#fv-inspect-score, #fv-inspect-el { padding: 16px; }
+.gauge-wrap { position: relative; width: 116px; margin: 4px auto 2px; }
+#fv-gauge { display: block; transform: rotate(-90deg); }
+.gauge-bg { fill: none; stroke: #ECECEA; stroke-width: 7; }
+.gauge-fg { fill: none; stroke-width: 7; stroke-linecap: round; transition: stroke-dasharray 0.4s ease, stroke 0.4s ease; }
+.gauge-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.grade { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; width: 20px; height: 20px; line-height: 18px; text-align: center; margin-bottom: 2px; background: var(--chrome-2); }
+.gauge-score { font-family: var(--font-mono); font-size: 30px; font-weight: 700; line-height: 1; }
+.score-title { text-align: center; font-weight: 700; font-size: 13px; margin-top: 6px; }
+.companion-line { text-align: center; font-family: var(--font-mono); font-size: 11.5px; color: var(--accent-dark); font-weight: 600; margin-top: 4px; }
+.summary-sentence { text-align: center; color: var(--muted); font-size: 12px; line-height: 1.45; margin: 6px 0 10px; padding: 0 2px; }
+.pill-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 4px; }
+.sev-count { font-size: 11px; font-weight: 600; font-family: var(--font-mono); padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border); background: var(--chrome-2); cursor: pointer; user-select: none; }
+.sev-count.off { opacity: 0.35; text-decoration: line-through; }
+.pill-hint { text-align: center; color: var(--muted); font-size: 10px; margin-bottom: 8px; }
+.cascade-check { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 11.5px; color: var(--muted); margin-bottom: 4px; cursor: pointer; }
+.cascade-check input { accent-color: var(--accent); }
+.side-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 16px 0 8px; }
+.cat-row { margin-bottom: 10px; }
+.cat-top { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+.cat-top .cat-val { font-weight: 700; font-family: var(--font-mono); }
+.cat-bar { height: 5px; border-radius: 999px; background: #EFEFEC; overflow: hidden; }
+.cat-bar span { display: block; height: 100%; border-radius: 999px; }
+#fv-profile { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--chrome-2); }
+.profile-desc { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+.walkthrough { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+.walkthrough summary { font-size: 10.5px; font-weight: 700; color: var(--muted); cursor: pointer; text-transform: uppercase; letter-spacing: 0.06em; }
+#fv-breakdown { font-size: 11.5px; margin-top: 8px; }
+.bd-row { display: flex; justify-content: space-between; gap: 8px; padding: 2.5px 0; border-bottom: 1px dashed var(--chrome-3); }
+.bd-row .bd-what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.bd-row .bd-val { flex-shrink: 0; font-family: var(--font-mono); }
+.bd-total { font-weight: 700; border-bottom: none; margin-top: 4px; }
+.bd-total .bd-what { color: var(--ink); }
+.bd-note { color: var(--muted); font-style: italic; padding: 4px 0; }
+.cascade-tag { color: var(--muted); font-style: italic; }
+.bd-group { border-bottom: 1px dashed var(--chrome-3); padding: 2.5px 0; }
+.bd-group summary { display: flex; justify-content: space-between; gap: 8px; cursor: pointer; list-style: none; color: var(--muted); }
+.bd-group summary::-webkit-details-marker { display: none; }
+.bd-group summary .bd-val { font-family: var(--font-mono); flex-shrink: 0; }
+.bd-group-inner { margin: 4px 0 2px 10px; padding-left: 8px; border-left: 2px solid var(--chrome-3); }
+.agent-note { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.agent-note strong { color: var(--ink); }
+
+/* inspect (element) view */
+#fv-back { display: flex; align-items: center; gap: 8px; border: none; background: none; color: var(--accent-dark); font-size: 12px; font-weight: 600; padding: 0; margin-bottom: 12px; cursor: pointer; }
+#fv-back .mini-score { font-family: var(--font-mono); font-weight: 700; color: var(--muted); background: var(--chrome-2); border-radius: 999px; padding: 1px 8px; }
+.insp-title { font-size: 13.5px; font-weight: 700; margin-bottom: 2px; }
+.insp-meta { color: var(--muted); font-size: 11.5px; margin-bottom: 4px; }
+.insp-selector { margin-bottom: 12px; }
+code, .copy { font-family: var(--font-mono); font-size: 11px; background: var(--chrome-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+.copy { cursor: pointer; }
+.copy:hover { border-color: var(--accent); }
+.copy.copied { background: var(--accent-tint); border-color: var(--accent); }
+.insp-row { padding: 8px 0; border-bottom: 1px solid var(--chrome-3); }
+.insp-prop { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.insp-prop .dot { width: 8px; height: 8px; border-radius: 50%; }
+.insp-vals { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.insp-vals .arrow { color: var(--muted); }
+.insp-delta { color: var(--muted); font-size: 10.5px; margin-top: 3px; }
+.insp-clean { color: var(--clean-ink); font-weight: 700; }
+.hint { color: var(--muted); font-style: italic; }
+
+/* ---- fix instructions drawer (resizable) ---- */
+#fv-drawer { flex-shrink: 0; border-top: 1px solid var(--border); background: var(--chrome); position: relative; }
+#fv-drawer-resize { height: 6px; margin-top: -3px; cursor: ns-resize; touch-action: none; position: relative; z-index: 2; }
+#fv-drawer-resize::before { content: ''; position: absolute; left: 50%; top: 1px; transform: translateX(-50%); width: 36px; height: 3px; border-radius: 999px; background: var(--chrome-3); }
+#fv-drawer-resize:hover::before, #fv-drawer-resize:focus-visible::before { background: var(--accent); }
+#fv-drawer.collapsed #fv-drawer-resize { display: none; }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; }
+#fv-drawer-toggle { display: flex; align-items: center; gap: 8px; border: none; background: none; font-size: 12.5px; font-weight: 700; cursor: pointer; padding: 0; }
+#fv-drawer-toggle .chev { color: var(--muted); font-size: 10px; transition: transform 0.15s; }
+#fv-drawer.collapsed #fv-drawer-toggle .chev { transform: rotate(180deg); }
+#fv-drawer-toggle .count-badge { background: var(--chrome-2); border: 1px solid var(--border); border-radius: 999px; padding: 0 8px; font-size: 10.5px; font-family: var(--font-mono); color: var(--muted); }
+#fv-copy-ins { font-size: 12px; font-weight: 700; padding: 6px 14px; border: none; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+#fv-copy-ins:hover { background: var(--accent-dark); }
+#fv-drawer-body { height: var(--drawer-h, 28vh); max-height: 70vh; min-height: 80px; overflow-y: auto; padding: 0 16px 14px; }
+#fv-drawer.collapsed #fv-drawer-body { display: none; }
+body.drawer-resizing { cursor: ns-resize; user-select: none; }
+body.drawer-resizing #fv-canvas { pointer-events: none; }
+#fv-instructions ol { margin: 0; padding-left: 22px; }
+#fv-instructions li { margin-bottom: 10px; }
+#fv-instructions .ins-details { margin: 4px 0 0; padding-left: 16px; }
+#fv-instructions .ins-details li { margin-bottom: 1px; font-family: var(--font-mono); font-size: 11px; color: #444; list-style: none; }
+#fv-instructions .ins-note { color: var(--muted); font-style: italic; font-size: 11.5px; margin-top: 3px; }
+.kind-pill { display: inline-block; margin-right: 6px; padding: 0 7px; border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; background: var(--chrome-2); border: 1px solid var(--border); color: var(--muted); }
+
+/* ---- toast ---- */
+#fv-toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 12px); z-index: 60; background: var(--ink); color: #fff; font-size: 12.5px; font-weight: 600; padding: 9px 16px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.25); opacity: 0; pointer-events: none; transition: opacity 0.18s ease, transform 0.18s ease; }
+#fv-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---- mobile tab bar (hidden ≥800px) ---- */
+#fv-tabbar { display: none; flex-shrink: 0; border-top: 1px solid var(--border); background: var(--chrome); }
+#fv-tabbar button { flex: 1; border: none; background: none; padding: 10px 0; font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer; border-top: 2px solid transparent; }
+#fv-tabbar button.active { color: var(--accent-dark); border-top-color: var(--accent); }
+#fv-tabbar .tab-count { font-family: var(--font-mono); color: inherit; margin-left: 4px; }
+
+/* =========================================================
+   Responsive: ≥1200px is the full 3-pane workspace (default).
+   ========================================================= */
+
+/* 800–1199px: canvas is primary; score/layers become overlay drawers. */
+@media (max-width: 1199.98px) {
+  #fv-layers, #fv-inspect {
+    position: fixed; top: 50px; bottom: 0; width: min(84vw, 300px);
+    z-index: 30; box-shadow: 0 8px 28px rgba(0,0,0,0.18);
+    transition: transform 0.2s ease;
+  }
+  /* Score opens from the left; layers from the right — matching desktop rails. */
+  #fv-inspect { left: 0; right: auto; border-right: 1px solid var(--border); border-left: none; transform: translateX(-100%); }
+  #fv-layers { right: 0; left: auto; border-left: 1px solid var(--border); border-right: none; transform: translateX(100%); }
+  #fv-layers.open, #fv-inspect.open { transform: translateX(0); }
+  .panel-toggle-btn { display: inline-flex; }
+  .panel-close { display: inline-flex; }
+  .inserters { flex: 1 1 100%; order: 5; }
+}
+@media (min-width: 1200px) {
+  .panel-toggle-btn, .panel-close { display: none !important; }
+  #fv-scrim { display: none !important; }
+}
+
+/* <800px: single column — mobile score header, full-width canvas, sheets, tab bar. */
+@media (max-width: 799.98px) {
+  #fv-toolbar { padding: 6px 10px; gap: 8px; }
+  #fv-toolbar .meta { display: none; }
+  .inserter-kicker { display: none; }
+  #fv-mobile-topbar { display: flex; }
+  #fv-layers, #fv-inspect { top: 120px; }
+  #fv-drawer { position: fixed; left: 0; right: 0; bottom: 44px; z-index: 20; box-shadow: 0 -6px 20px rgba(0,0,0,0.10); }
+  #fv-tabbar { display: flex; }
+  body.mobile-fixes #fv-canvas, body.mobile-fixes #fv-legend { display: none; }
+  /* Neutralize #fv-editor's flex-grow (its fixed-position children still render) so the drawer can claim the freed space. */
+  body.mobile-fixes #fv-editor { flex: 0 0 auto; height: 0; overflow: hidden; }
+  body.mobile-fixes #fv-drawer { position: static; box-shadow: none; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  body.mobile-fixes #fv-drawer-body { flex: 1; max-height: none; }
+  body.mobile-fixes #fv-drawer.collapsed #fv-drawer-body { display: block; }
+}
+@media (min-width: 800px) {
+  #fv-mobile-topbar, #fv-tabbar { display: none !important; }
+}
 </style>
 </head>
-<body>
-<main>
-  <div class="brand">
-    <svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true">
+<body class="mode-side">
+<div id="fv-scrim"></div>
+<header id="fv-toolbar">
+  <h1 class="brand">
+    <svg class="brand-mark" width="18" height="18" viewBox="0 0 20 20" aria-hidden="true">
       <rect x="1.2" y="1.2" width="17.6" height="17.6" rx="5" fill="none" stroke="currentColor" stroke-width="1.6" />
-      <path d="M5.6 10.4l3 3 6-6.8" fill="none" stroke="#0E7C7B" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M5.6 10.4l3 3 6-6.8" fill="none" stroke="var(--accent)" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
-    Figma Verify
+    <span>Figma Verify</span>
+  </h1>
+  <div class="inserters" role="group" aria-label="Source inputs">
+    <label class="inserter" id="fv-code-inserter" title="Select the folder with your implementation files">
+      <input type="file" id="fv-code-input" webkitdirectory multiple hidden />
+      <svg class="inserter-ic" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5h5l1.5 1.5H14.5v8H1.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      <span class="inserter-kicker">Code folder</span>
+      <span class="inserter-value" id="fv-code-value">Choose folder…</span>
+    </label>
+    <label class="inserter" id="fv-figma-inserter" title="Select a Figma export, design fixture JSON, or mockup image">
+      <input type="file" id="fv-figma-input" accept=".fig,.json,.png,.jpg,.jpeg,.webp,.svg,image/*,application/json" hidden />
+      <svg class="inserter-ic" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 9l2-2.5 2 1.5L11 5.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="inserter-kicker">Figma mockup</span>
+      <span class="inserter-value" id="fv-figma-value">Choose file…</span>
+    </label>
   </div>
-  <h1>An MCP server that lets AI agents check their code against the design.</h1>
-  <p class="lede">This page is generated on every push by <code>demo:report</code> — the report below is real output, not a mockup.</p>
+  <div class="meta" id="fv-meta"></div>
+  <button class="panel-toggle-btn" id="fv-toggle-inspect" type="button" aria-expanded="false" aria-controls="fv-inspect">Score</button>
+  <div class="tb-group seg" id="fv-mode" role="radiogroup" aria-label="Compare mode">
+    <button type="button" data-mode="side" class="active" role="radio" aria-checked="true" tabindex="0">Side by side</button>
+    <button type="button" data-mode="overlay" role="radio" aria-checked="false" tabindex="-1">Overlay</button>
+    <button type="button" data-mode="swipe" role="radio" aria-checked="false" tabindex="-1">Swipe</button>
+  </div>
+  <div class="tb-group" id="fv-onion" hidden>
+    <label for="fv-onion-slider">Design opacity</label>
+    <input type="range" id="fv-onion-slider" min="0" max="100" value="50" aria-label="Design opacity" />
+  </div>
+  <div class="tb-group zoom">
+    <button type="button" id="fv-zoom-out" title="Zoom out (- key)">&minus;</button>
+    <span id="fv-zoom" aria-live="polite">100%</span>
+    <button type="button" id="fv-zoom-in" title="Zoom in (+ key)">+</button>
+    <button type="button" id="fv-zoom-fit" title="Fit to view (0 key)">Fit</button>
+    <button type="button" id="fv-zoom-100" title="Actual size (1 key)">100%</button>
+  </div>
+  <button id="fv-overlay-toggle" type="button" aria-pressed="true"><span class="tog-dot"></span>Markers on</button>
+  <button class="panel-toggle-btn" id="fv-toggle-layers" type="button" aria-expanded="false" aria-controls="fv-layers">Layers</button>
+</header>
+<div id="fv-mobile-topbar">
+  <span class="m-grade" id="fv-m-grade"></span>
+  <span class="m-score" id="fv-m-score"></span>
+  <span class="m-companion" id="fv-m-companion"></span>
+</div>
+<div id="fv-editor">
+  <aside id="fv-inspect">
+    <div class="panel-head">Score<button class="panel-close" id="fv-close-inspect" type="button" aria-label="Close score panel">&times;</button></div>
+    <div id="fv-inspect-score">
+      <div class="gauge-wrap">
+        <svg id="fv-gauge" viewBox="0 0 96 96" width="116" height="116" aria-hidden="true">
+          <circle class="gauge-bg" cx="48" cy="48" r="40" />
+          <circle class="gauge-fg" id="fv-gauge-arc" cx="48" cy="48" r="40" />
+        </svg>
+        <div class="gauge-center">
+          <span class="grade" id="fv-grade"></span>
+          <span class="gauge-score" id="fv-score"></span>
+        </div>
+      </div>
+      <div class="score-title">Fidelity Score</div>
+      <div class="companion-line" id="fv-companion"></div>
+      <p class="summary-sentence" id="fv-summary"></p>
+      <div class="pill-row" id="fv-sev-pills"></div>
+      <div class="pill-hint" id="fv-pill-hint">Click a pill to filter markers</div>
+      <label class="cascade-check"><input type="checkbox" id="fv-show-cascade" /> Show cascade markers</label>
+      <div class="side-label">Score breakdown</div>
+      <div id="fv-categories"></div>
+      <div class="side-label">Scoring profile</div>
+      <select id="fv-profile" aria-label="Scoring profile"></select>
+      <p class="profile-desc" id="fv-profile-desc"></p>
+      <details class="walkthrough">
+        <summary>Score walkthrough (root causes first)</summary>
+        <div id="fv-breakdown"></div>
+      </details>
+      <p class="agent-note">This report is <strong>agent-loop ready</strong>: feed the fix instructions below to the agent that built this page, then re-run <code>verify_implementation</code> until the score is 100.</p>
+    </div>
+    <div id="fv-inspect-el" hidden>
+      <div id="fv-detail"></div>
+    </div>
+  </aside>
+  <div id="fv-canvas">
+    <div id="fv-world">
+      <div class="frame-block" id="fv-design-block">
+        <div class="frame-label"><span id="fv-design-label"></span></div>
+        <div class="stage" id="fv-design-stage"></div>
+      </div>
+      <div class="frame-block" id="fv-impl-block">
+        <div class="frame-label"><span id="fv-impl-label"></span></div>
+        <div class="stage" id="fv-impl-stage"></div>
+      </div>
+      <div id="fv-swipe-handle" role="slider" tabindex="0" aria-label="Swipe position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" hidden><div class="grip"></div></div>
+    </div>
+    <div id="fv-legend"></div>
+  </div>
+  <aside id="fv-layers">
+    <div class="panel-head">Layers<button class="panel-close" id="fv-close-layers" type="button" aria-label="Close layers panel">&times;</button></div>
+    <div id="fv-tree"></div>
+  </aside>
+</div>
+<div id="fv-drawer" class="">
+  <div id="fv-drawer-resize" role="separator" aria-orientation="horizontal" aria-label="Resize fix instructions panel" tabindex="0" title="Drag to resize"></div>
+  <div class="drawer-head">
+    <button id="fv-drawer-toggle" type="button" aria-expanded="true" aria-controls="fv-drawer-body">
+      <span class="chev">&#9662;</span>
+      Fix instructions (for the implementing agent)
+      <span class="count-badge" id="fv-drawer-count"></span>
+    </button>
+    <button id="fv-copy-ins" type="button">Copy as agent prompt</button>
+  </div>
+  <div id="fv-drawer-body"><div id="fv-instructions"></div></div>
+</div>
+<div id="fv-tabbar">
+  <button id="fv-tab-canvas" class="active" type="button">Canvas</button>
+  <button id="fv-tab-fixes" type="button">Fix instructions <span class="tab-count" id="fv-tab-fixes-count"></span></button>
+</div>
+<div id="fv-toast" role="status" aria-live="polite"></div>
+<script type="application/json" id="fv-data">{"report":{"liveUrl":"file:///Users/pooja/Downloads/Figma Projects/figma-verify/demo/index.html","frameName":"Signup Card","viewportWidth":800,"fidelityScore":18,"scoringProfile":"balanced","scores":{"balanced":18,"strict":18,"perElement":68.5,"rootCause":40.5},"totals":{"critical":2,"high":2,"medium":21,"low":0},"missing":[{"designId":"1:9","designName":"Guarantee Badge","role":"container"},{"designId":"1:10","designName":"Badge Label","role":"text"}],"elements":[{"designId":"1:3","designName":"Card","role":"container","matched":true,"selector":"body > div.card","matchMethod":"container","designBounds":{"x":200,"y":120,"w":400,"h":296},"domBounds":{"x":200,"y":120,"w":400,"h":234},"diffs":[{"property":"height","expected":296,"actual":234,"severity":"medium","delta":"-62px"},{"property":"borderRadius","expected":16,"actual":8,"severity":"medium","delta":"-8px"},{"property":"paddingTop","expected":32,"actual":24,"severity":"medium","delta":"-8px"},{"property":"paddingRight","expected":32,"actual":24,"severity":"medium","delta":"-8px"},{"property":"paddingBottom","expected":32,"actual":24,"severity":"medium","delta":"-8px"},{"property":"paddingLeft","expected":32,"actual":24,"severity":"medium","delta":"-8px"}]},{"designId":"1:4","designName":"Title","role":"text","matched":true,"selector":"body > div.card > div.title:nth-of-type(1)","matchMethod":"text","designBounds":{"x":232,"y":152,"w":336,"h":32},"domBounds":{"x":225,"y":145,"w":350,"h":32},"diffs":[{"property":"fontSize","expected":24,"actual":20,"severity":"high","delta":"-4px"},{"property":"width","expected":336,"actual":350,"severity":"medium","delta":"+14px","cascade":true},{"property":"x","expected":232,"actual":225,"severity":"medium","delta":"-7px","cascade":true},{"property":"y","expected":152,"actual":145,"severity":"medium","delta":"-7px","cascade":true}]},{"designId":"1:5","designName":"Subtitle","role":"text","matched":true,"selector":"body > div.card > div.subtitle:nth-of-type(2)","matchMethod":"text","designBounds":{"x":232,"y":204,"w":336,"h":24},"domBounds":{"x":225,"y":197,"w":350,"h":24},"diffs":[{"property":"width","expected":336,"actual":350,"severity":"medium","delta":"+14px","cascade":true},{"property":"x","expected":232,"actual":225,"severity":"medium","delta":"-7px","cascade":true},{"property":"y","expected":204,"actual":197,"severity":"medium","delta":"-7px","cascade":true}]},{"designId":"1:6","designName":"Primary Button","role":"container","matched":true,"selector":"body > div.card > div.button:nth-of-type(3)","matchMethod":"container","designBounds":{"x":232,"y":248,"w":336,"h":48},"domBounds":{"x":225,"y":241,"w":350,"h":48},"diffs":[{"property":"backgroundColor","expected":"#4f46e5","actual":"#7c3aed","severity":"high","delta":"ΔRGB 47"},{"property":"width","expected":336,"actual":350,"severity":"medium","delta":"+14px","cascade":true},{"property":"x","expected":232,"actual":225,"severity":"medium","delta":"-7px","cascade":true},{"property":"y","expected":248,"actual":241,"severity":"medium","delta":"-7px","cascade":true}]},{"designId":"1:7","designName":"Button Label","role":"text","matched":true,"selector":"body > div.card > div.button:nth-of-type(3) > div.button-label","matchMethod":"text","designBounds":{"x":232,"y":260,"w":336,"h":24},"domBounds":{"x":225,"y":253,"w":350,"h":24},"diffs":[{"property":"width","expected":336,"actual":350,"severity":"medium","delta":"+14px","cascade":true},{"property":"x","expected":232,"actual":225,"severity":"medium","delta":"-7px","cascade":true},{"property":"y","expected":260,"actual":253,"severity":"medium","delta":"-7px","cascade":true}]},{"designId":"1:8","designName":"Sign In Link","role":"text","matched":true,"selector":"body > div.card > div.signin:nth-of-type(4)","matchMethod":"text","designBounds":{"x":232,"y":316,"w":336,"h":20},"domBounds":{"x":225,"y":309,"w":350,"h":20},"diffs":[{"property":"width","expected":336,"actual":350,"severity":"medium","delta":"+14px","cascade":true},{"property":"x","expected":232,"actual":225,"severity":"medium","delta":"-7px","cascade":true},{"property":"y","expected":316,"actual":309,"severity":"medium","delta":"-7px","cascade":true}]},{"designId":"1:9","designName":"Guarantee Badge","role":"container","matched":false,"matchMethod":"unmatched","designBounds":{"x":232,"y":356,"w":336,"h":28},"diffs":[{"property":"existence","expected":"present (container)","actual":null,"severity":"critical"}]},{"designId":"1:10","designName":"Badge Label","role":"text","matched":false,"matchMethod":"unmatched","designBounds":{"x":232,"y":356,"w":336,"h":28},"diffs":[{"property":"existence","expected":"present (text: \"14-day money-back guarantee\")","actual":null,"severity":"critical"}]}],"fixInstructions":[{"step":1,"kind":"create","selector":"body > div.card","designName":"Guarantee Badge","summary":"Create the missing container \"Guarantee Badge\" inside `body > div.card` as its last child:","details":["size: 336x28px at x=232 y=356 (frame-relative)","background-color: #ecfdf5","border-radius: 14px","contains text \"Badge Label\":","  size: 336x28px at x=232 y=356 (frame-relative)","  text: \"14-day money-back guarantee\"","  color: #047857","  font-family: Arial","  font-size: 13px","  font-weight: 600","  line-height: 28px"]},{"step":2,"kind":"style","selector":"body > div.card > div.title:nth-of-type(1)","designName":"Title","summary":"In `body > div.card > div.title:nth-of-type(1)`, fix this style property:","details":["font-size: 24px  (currently 20px)"]},{"step":3,"kind":"style","selector":"body > div.card > div.button:nth-of-type(3)","designName":"Primary Button","summary":"In `body > div.card > div.button:nth-of-type(3)`, fix this style property:","details":["background-color: #4f46e5  (currently #7c3aed)"]},{"step":4,"kind":"layout","selector":"body > div.card","designName":"Card","summary":"In `body > div.card`, fix the layout:","details":["padding: 32px  (currently 24px)","border-radius: 16px  (currently 8px)"],"note":"This also resolves 15 cascade position/size diffs on descendant elements — no separate action needed for those."},{"step":5,"kind":"geometry","selector":"body > div.card","designName":"Card","summary":"In `body > div.card`, the rendered box drifts from the design:","details":["height: expected 296px, got 234px (-62px)"],"note":"Re-verify before hand-tuning: box drift like this usually disappears once the earlier steps are applied."}],"generatedAt":"2026-08-11T15:22:56.150Z"},"design":[{"id":"1:2","role":"container","name":"Signup Card","bounds":{"x":0,"y":0,"w":800,"h":536},"styles":{"backgroundColor":"#f8fafc"},"childIds":["1:3"]},{"id":"1:3","role":"container","name":"Card","bounds":{"x":200,"y":120,"w":400,"h":296},"styles":{"backgroundColor":"#ffffff","borderColor":"#e2e8f0","borderWidth":1,"borderRadius":16,"gap":20,"paddingTop":32,"paddingRight":32,"paddingBottom":32,"paddingLeft":32},"childIds":["1:4","1:5","1:6","1:8","1:9"],"parentId":"1:2"},{"id":"1:4","role":"text","name":"Title","bounds":{"x":232,"y":152,"w":336,"h":32},"styles":{"textColor":"#0f172a","fontFamily":"Arial","fontSize":24,"fontWeight":700,"lineHeight":32},"childIds":[],"parentId":"1:3","text":"create your account"},{"id":"1:5","role":"text","name":"Subtitle","bounds":{"x":232,"y":204,"w":336,"h":24},"styles":{"textColor":"#475569","fontFamily":"Arial","fontSize":15,"fontWeight":400,"lineHeight":24},"childIds":[],"parentId":"1:3","text":"start your 30-day free trial."},{"id":"1:6","role":"container","name":"Primary Button","bounds":{"x":232,"y":248,"w":336,"h":48},"styles":{"backgroundColor":"#4f46e5","borderRadius":8,"gap":0,"paddingTop":0,"paddingRight":0,"paddingBottom":0,"paddingLeft":0},"childIds":["1:7"],"parentId":"1:3"},{"id":"1:7","role":"text","name":"Button Label","bounds":{"x":232,"y":260,"w":336,"h":24},"styles":{"textColor":"#ffffff","fontFamily":"Arial","fontSize":16,"fontWeight":600,"lineHeight":24},"childIds":[],"parentId":"1:6","text":"get started"},{"id":"1:8","role":"text","name":"Sign In Link","bounds":{"x":232,"y":316,"w":336,"h":20},"styles":{"textColor":"#475569","fontFamily":"Arial","fontSize":14,"fontWeight":400,"lineHeight":20},"childIds":[],"parentId":"1:3","text":"already have an account? sign in"},{"id":"1:9","role":"container","name":"Guarantee Badge","bounds":{"x":232,"y":356,"w":336,"h":28},"styles":{"backgroundColor":"#ecfdf5","borderRadius":14,"gap":0,"paddingTop":0,"paddingRight":0,"paddingBottom":0,"paddingLeft":0},"childIds":["1:10"],"parentId":"1:3"},{"id":"1:10","role":"text","name":"Badge Label","bounds":{"x":232,"y":356,"w":336,"h":28},"styles":{"textColor":"#047857","fontFamily":"Arial","fontSize":13,"fontWeight":600,"lineHeight":28},"childIds":[],"parentId":"1:9","text":"14-day money-back guarantee"}],"screenshot":"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"}</script>
+<script>
+(function () {
+  var payload = JSON.parse(document.getElementById('fv-data').textContent);
+  var report = payload.report;
+  var design = payload.design;
+  var frame = design[0];
+  var W = frame.bounds.w, H = frame.bounds.h;
+  var GAP = 96;
 
-  <a class="card" href="./report.html">
-    <span class="tag">Start here</span>
-    <h2>Interactive drift report →</h2>
-    <p>Fidelity score, root-cause companion line, layers tree, a pannable/zoomable side-by-side canvas, three compare modes, and the ordered agent fix instructions with a copy-as-prompt button.</p>
-  </a>
+  var DEDUCTIONS = { critical: 15, high: 5, medium: 2, low: 0.5 };
+  var CASCADE_DISCOUNT = 0.25;
+  var CAPS = { critical: 40, high: 75 };
+  var SEV_HEX = { critical: '#F0472A', high: '#E8890C', medium: '#C99A02', low: '#8B5CF6', clean: '#12966B' };
+  var SEV_INK = { critical: '#C3341C', high: '#A8620A', medium: '#8A6C00', low: '#6D3FD6', clean: '#0B7A56' };
+  var SEV_LABEL = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' };
+  var CHIP_DARK = { medium: true, high: true };
+  var PROFILES = {
+    balanced: { label: 'Balanced', desc: '100 minus flat weighted deductions (critical -15, high -5, medium -2, low -0.5). Default; comparable run-to-run.' },
+    strict: { label: 'Strict', desc: 'Balanced deductions, but any critical caps the score at 40 and any high at 75. Good as a CI release gate.' },
+    perElement: { label: 'Per-element', desc: 'Each element scored 0-100 on its own diffs (missing = 0); final score is the mean. Robust to page size.' },
+    rootCause: { label: 'Root cause', desc: 'Cascade diffs (caused by a parent\u2019s drift) count at 25% weight, so one bad padding value reads as one problem.' }
+  };
+  var CATEGORIES = [
+    { name: 'Typography', props: ['text', 'fontFamily', 'fontSize', 'fontWeight', 'lineHeight'] },
+    { name: 'Color & Theming', props: ['backgroundColor', 'textColor', 'borderColor'] },
+    { name: 'Spacing & Layout', props: ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'gap', 'borderRadius', 'borderWidth', 'x', 'y', 'width', 'height'] },
+    { name: 'Components', props: ['existence'] }
+  ];
 
-  <a class="card" href="./demo-implementation.html">
-    <span class="tag">Input</span>
-    <h2>The flawed implementation →</h2>
-    <p>A deliberately buggy build of the "Signup Card" design (five planted flaws) — this is what the report above is scoring.</p>
-  </a>
+  // ---------- helpers ----------
+  function round1(v) { return Math.round(v * 10) / 10; }
+  function px(v) { return v + 'px'; }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function ded(diff, discount) {
+    var base = DEDUCTIONS[diff.severity];
+    return discount && diff.cascade ? base * CASCADE_DISCOUNT : base;
+  }
+  function allDiffs() {
+    var out = [];
+    report.elements.forEach(function (el) {
+      el.diffs.forEach(function (d) { out.push({ el: el, diff: d }); });
+    });
+    return out;
+  }
+  function computeScore(profile) {
+    var items = allDiffs();
+    if (profile === 'perElement') {
+      if (report.elements.length === 0) return 100;
+      var sum = 0;
+      report.elements.forEach(function (el) {
+        if (!el.matched) return;
+        var t = 0;
+        el.diffs.forEach(function (d) { t += ded(d, false); });
+        sum += Math.max(0, 100 - t);
+      });
+      return round1(sum / report.elements.length);
+    }
+    var discount = profile === 'rootCause';
+    var total = 0;
+    items.forEach(function (it) { total += ded(it.diff, discount); });
+    var score = Math.max(0, 100 - total);
+    if (profile === 'strict') {
+      Object.keys(CAPS).forEach(function (sev) {
+        if (items.some(function (it) { return it.diff.severity === sev; })) score = Math.min(score, CAPS[sev]);
+      });
+    }
+    return round1(score);
+  }
+  function grade(score) {
+    return score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
+  }
+  function gradeHex(score) {
+    return score >= 80 ? SEV_HEX.clean : score >= 60 ? SEV_HEX.medium : score >= 40 ? SEV_HEX.high : SEV_HEX.critical;
+  }
+  /** Category deduction color: never "healthy green" when a category has any deduction. */
+  function catColor(catDed) {
+    if (catDed <= 0) return { hex: SEV_HEX.clean, ink: SEV_INK.clean };
+    if (catDed >= 15) return { hex: SEV_HEX.critical, ink: SEV_INK.critical };
+    if (catDed >= 5) return { hex: SEV_HEX.high, ink: SEV_INK.high };
+    return { hex: SEV_HEX.medium, ink: SEV_INK.medium };
+  }
+  function worstSeverity(el) {
+    if (!el.matched) return 'critical';
+    var order = ['critical', 'high', 'medium', 'low'];
+    for (var i = 0; i < order.length; i++) {
+      if (el.diffs.some(function (d) { return d.severity === order[i]; })) return order[i];
+    }
+    return 'clean';
+  }
+  var reportById = {};
+  report.elements.forEach(function (el) { reportById[el.designId] = el; });
+  var instructions = report.fixInstructions || [];
 
-  <a class="card" href="./design-reference.html">
-    <span class="tag">Reference</span>
-    <h2>Pixel-faithful reference build →</h2>
-    <p>The same design implemented correctly — scores 100/100 against the same fixture.</p>
-  </a>
+  // ---------- toast ----------
+  var toastTimer;
+  function showToast(msg) {
+    var t = document.getElementById('fv-toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
+  }
 
-  <footer>
-    Source, MCP setup, and the full scoring/matching writeup: <a href="https://github.com/pookie2006/figma-verify">github.com/pookie2006/figma-verify</a>
-  </footer>
-</main>
+  // ---------- toolbar meta ----------
+  var sources = { code: null, figma: null };
+  function updateMeta(score) {
+    var meta = document.getElementById('fv-meta');
+    meta.innerHTML = '<strong>' + esc(frame.name) + '</strong>' +
+      '<span class="meta-sep">\u00b7</span>Fidelity <strong>' + score + '</strong>/100' +
+      '<span class="meta-sep">\u00b7</span><span class="agent-chip">Agent-loop ready</span>';
+    var srcBits = [];
+    if (sources.code) srcBits.push('code: ' + sources.code);
+    if (sources.figma) srcBits.push('figma: ' + sources.figma);
+    meta.title = (srcBits.length ? srcBits.join('  \u00b7  ') + '  \u00b7  ' : '') +
+      (report.liveUrl || 'no live URL') + '  \u00b7  viewport ' + report.viewportWidth + 'px  \u00b7  generated ' + report.generatedAt;
+  }
+
+  // ---------- source inserters (code folder + Figma mockup) ----------
+  var codeInput = document.getElementById('fv-code-input');
+  var figmaInput = document.getElementById('fv-figma-input');
+  var codeValue = document.getElementById('fv-code-value');
+  var figmaValue = document.getElementById('fv-figma-value');
+  var codeInserter = document.getElementById('fv-code-inserter');
+  var figmaInserter = document.getElementById('fv-figma-inserter');
+
+  codeInput.addEventListener('change', function () {
+    var files = Array.prototype.slice.call(codeInput.files || []);
+    if (!files.length) return;
+    var root = '';
+    var firstPath = files[0].webkitRelativePath || files[0].name;
+    if (firstPath.indexOf('/') !== -1) root = firstPath.split('/')[0];
+    else root = files[0].name;
+    sources.code = root + ' (' + files.length + ' file' + (files.length === 1 ? '' : 's') + ')';
+    codeValue.textContent = sources.code;
+    codeInserter.classList.add('has-file');
+    showToast('Loaded code folder \u2014 ' + sources.code);
+    updateMeta(activeScore);
+  });
+
+  figmaInput.addEventListener('change', function () {
+    var file = (figmaInput.files || [])[0];
+    if (!file) return;
+    sources.figma = file.name;
+    figmaValue.textContent = file.name;
+    figmaInserter.classList.add('has-file');
+    // If the mockup is an image, optionally preview it as a ghost on the design stage.
+    if (file.type && file.type.indexOf('image/') === 0) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        var old = document.getElementById('fv-mockup-preview');
+        if (old) old.remove();
+        var img = document.createElement('img');
+        img.id = 'fv-mockup-preview';
+        img.alt = 'Uploaded Figma mockup preview';
+        img.src = String(reader.result);
+        img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0.35;pointer-events:none;z-index:1;';
+        designStage.appendChild(img);
+        showToast('Loaded Figma mockup \u2014 ' + file.name);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      showToast('Loaded Figma mockup \u2014 ' + file.name);
+    }
+    updateMeta(activeScore);
+  });
+
+  // ---------- frames + stage content ----------
+  var designBlock = document.getElementById('fv-design-block');
+  var implBlock = document.getElementById('fv-impl-block');
+  var designStage = document.getElementById('fv-design-stage');
+  var implStage = document.getElementById('fv-impl-stage');
+  [designStage, implStage].forEach(function (s) { s.style.width = px(W); s.style.height = px(H); });
+  [designBlock, implBlock].forEach(function (b) { b.style.width = px(W); b.style.height = px(H); });
+  document.getElementById('fv-design-label').textContent = frame.name + ' \u2014 Design';
+  document.getElementById('fv-impl-label').textContent = frame.name + ' \u2014 Implementation';
+
+  // Paint the design from the normalized spec (parents come before children).
+  designStage.style.background = (frame.styles.backgroundColor || '#ffffff');
+  design.slice(1).forEach(function (el) {
+    var d = document.createElement('div');
+    d.className = 'fv-el';
+    d.style.left = px(el.bounds.x); d.style.top = px(el.bounds.y);
+    d.style.width = px(el.bounds.w); d.style.height = px(el.bounds.h);
+    var st = el.styles || {};
+    if (st.backgroundColor) d.style.background = st.backgroundColor;
+    if (st.borderRadius) d.style.borderRadius = px(st.borderRadius);
+    if (st.borderWidth && st.borderColor) d.style.border = st.borderWidth + 'px solid ' + st.borderColor;
+    if (st.opacity != null) d.style.opacity = String(st.opacity);
+    if (el.role === 'text' && el.text) {
+      d.textContent = el.text;
+      if (st.textColor) d.style.color = st.textColor;
+      if (st.fontFamily) d.style.fontFamily = st.fontFamily;
+      if (st.fontSize) d.style.fontSize = px(st.fontSize);
+      if (st.fontWeight) d.style.fontWeight = String(st.fontWeight);
+      d.style.lineHeight = st.lineHeight ? px(st.lineHeight) : px(el.bounds.h);
+      d.style.whiteSpace = 'nowrap';
+    }
+    designStage.appendChild(d);
+  });
+
+  if (payload.screenshot) {
+    var img = document.createElement('img');
+    img.src = 'data:image/png;base64,' + payload.screenshot;
+    img.width = W;
+    img.alt = 'Screenshot of the live implementation of ' + frame.name;
+    implStage.appendChild(img);
+  } else {
+    implStage.style.background = '#fafafa';
+    var msg = document.createElement('p');
+    msg.className = 'hint';
+    msg.style.padding = '12px';
+    msg.textContent = 'No screenshot captured for this run.';
+    implStage.appendChild(msg);
+  }
+
+  // ---------- markers ----------
+  var markerNo = {};
+  var nextMarker = 1;
+  report.elements.forEach(function (el) {
+    if (!el.matched || el.diffs.length) markerNo[el.designId] = nextMarker++;
+  });
+  var regOv = {};   // designId -> [overlay nodes]
+  var regChip = {}; // designId -> [chip nodes]
+
+  function addOverlay(stage, bounds, el, missing) {
+    var sev = worstSeverity(el);
+    var o = document.createElement('div');
+    o.className = 'fv-ov fv-sev-' + sev + (missing ? ' fv-missing' : '');
+    o.style.left = px(bounds.x); o.style.top = px(bounds.y);
+    o.style.width = px(bounds.w); o.style.height = px(bounds.h);
+    o.dataset.designId = el.designId;
+    o.dataset.name = el.designName + (missing ? ' (missing)' : '');
+    ['tl', 'tr', 'bl', 'br'].forEach(function (c) {
+      var hnd = document.createElement('span');
+      hnd.className = 'h ' + c;
+      o.appendChild(hnd);
+    });
+    o.addEventListener('click', function (e) { e.stopPropagation(); select(el.designId); });
+    o.addEventListener('mouseenter', function () { setHover(el.designId, true); });
+    o.addEventListener('mouseleave', function () { setHover(el.designId, false); });
+    stage.appendChild(o);
+    (regOv[el.designId] = regOv[el.designId] || []).push(o);
+    if (markerNo[el.designId]) {
+      var chip = document.createElement('div');
+      chip.className = 'fv-chip' + (CHIP_DARK[sev] ? ' chip-dark' : '');
+      chip.textContent = String(markerNo[el.designId]);
+      chip.style.left = px(Math.max(0, bounds.x - 4));
+      chip.style.top = px(Math.max(0, bounds.y - 8));
+      chip.style.background = SEV_HEX[sev] || SEV_HEX.clean;
+      chip.title = el.designName;
+      chip.addEventListener('click', function (e) { e.stopPropagation(); select(el.designId); });
+      stage.appendChild(chip);
+      (regChip[el.designId] = regChip[el.designId] || []).push(chip);
+    }
+  }
+  report.elements.forEach(function (el) {
+    addOverlay(designStage, el.designBounds, el, !el.matched);
+    if (el.matched && el.domBounds) addOverlay(implStage, el.domBounds, el, false);
+  });
+
+  function setHover(id, on) {
+    (regOv[id] || []).forEach(function (n) { n.classList.toggle('hovered', on); });
+  }
+
+  // ---------- legend ----------
+  var lg = '<span>Legend</span>';
+  ['critical', 'high', 'medium', 'low'].forEach(function (sev) {
+    lg += '<span class="lg"><span class="sw" style="border-color:' + SEV_HEX[sev] + ';background:' + SEV_HEX[sev] + '22"></span>' + SEV_LABEL[sev] + '</span>';
+  });
+  lg += '<span class="lg"><span class="sw" style="border-color:' + SEV_HEX.critical + ';border-style:dashed;background:transparent"></span>Missing</span>';
+  document.getElementById('fv-legend').innerHTML = lg;
+
+  // ---------- layers tree ----------
+  var kids = {};
+  design.forEach(function (el) {
+    if (el.parentId) (kids[el.parentId] = kids[el.parentId] || []).push(el);
+  });
+  var tree = document.getElementById('fv-tree');
+  var treeRows = {}; // designId -> row node
+
+  function buildTreeRow(el, depth) {
+    var wrap = document.createElement('div');
+    var row = document.createElement('div');
+    row.className = 'tree-row';
+    row.style.paddingLeft = px(4 + depth * 14);
+    var children = kids[el.id] || [];
+
+    var chev = document.createElement('span');
+    chev.className = 'chev';
+    chev.textContent = children.length ? '\u25be' : '';
+    row.appendChild(chev);
+
+    var ic = document.createElement('span');
+    ic.className = 'layer-ic' + (el.role === 'text' ? '' : ' ic-frame');
+    if (el.role === 'text') ic.textContent = 'T';
+    row.appendChild(ic);
+
+    var rep = reportById[el.id];
+    var name = document.createElement('span');
+    name.className = 'tree-name';
+    name.innerHTML = esc(el.name) + (rep && !rep.matched ? ' <span class="missing-tag">missing</span>' : '');
+    row.appendChild(name);
+
+    if (rep && markerNo[el.id]) {
+      var mk = document.createElement('span');
+      var sev = worstSeverity(rep);
+      mk.className = 'mk' + (CHIP_DARK[sev] ? ' chip-dark' : '');
+      mk.textContent = String(markerNo[el.id]);
+      mk.style.background = SEV_HEX[sev];
+      if (CHIP_DARK[sev]) mk.style.color = '#1A1B1E';
+      row.appendChild(mk);
+    }
+    if (rep) {
+      var dot = document.createElement('span');
+      dot.className = 'dot';
+      dot.style.background = SEV_HEX[worstSeverity(rep)];
+      row.appendChild(dot);
+      row.dataset.designId = el.id;
+      treeRows[el.id] = row;
+      row.addEventListener('click', function () { select(el.id); closeOverlayPanelsOnSelect(); });
+      row.addEventListener('mouseenter', function () { setHover(el.id, true); });
+      row.addEventListener('mouseleave', function () { setHover(el.id, false); });
+    }
+    wrap.appendChild(row);
+
+    if (children.length) {
+      var kidBox = document.createElement('div');
+      kidBox.className = 'tree-kids';
+      children.forEach(function (c) { kidBox.appendChild(buildTreeRow(c, depth + 1)); });
+      wrap.appendChild(kidBox);
+      chev.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var hidden = kidBox.classList.toggle('hidden');
+        chev.textContent = hidden ? '\u25b8' : '\u25be';
+      });
+    }
+    return wrap;
+  }
+  tree.appendChild(buildTreeRow(frame, 0));
+
+  // ---------- selection + inspect panel ----------
+  var selectedId = null;
+  var inspectScore = document.getElementById('fv-inspect-score');
+  var inspectEl = document.getElementById('fv-inspect-el');
+  var activeScore = report.fidelityScore;
+
+  function clearGhost() {
+    var g = document.getElementById('fv-ghost');
+    if (g) g.remove();
+  }
+  function drawGhost(el) {
+    clearGhost();
+    if (!el || !el.matched || !el.domBounds) return;
+    var db = el.designBounds, ib = el.domBounds;
+    var parts = [];
+    if (Math.abs(ib.x - db.x) > 0.5) parts.push('\u0394x ' + Math.round(ib.x - db.x) + 'px');
+    if (Math.abs(ib.y - db.y) > 0.5) parts.push('\u0394y ' + Math.round(ib.y - db.y) + 'px');
+    if (Math.abs(ib.w - db.w) > 0.5) parts.push('\u0394w ' + Math.round(ib.w - db.w) + 'px');
+    if (Math.abs(ib.h - db.h) > 0.5) parts.push('\u0394h ' + Math.round(ib.h - db.h) + 'px');
+    if (!parts.length) return;
+    var g = document.createElement('div');
+    g.id = 'fv-ghost';
+    g.style.left = px(db.x); g.style.top = px(db.y);
+    g.style.width = px(db.w); g.style.height = px(db.h);
+    var lbl = document.createElement('span');
+    lbl.className = 'ghost-label';
+    lbl.textContent = 'expected \u00b7 ' + parts.join(' \u00b7 ');
+    g.appendChild(lbl);
+    implStage.appendChild(g);
+  }
+
+  function select(id) {
+    selectedId = id;
+    Object.keys(regOv).forEach(function (k) {
+      regOv[k].forEach(function (n) { n.classList.toggle('selected', k === id); });
+    });
+    Object.keys(treeRows).forEach(function (k) {
+      treeRows[k].classList.toggle('selected', k === id);
+    });
+    var el = id ? reportById[id] : null;
+    drawGhost(el);
+    if (el) {
+      renderInspect(el);
+      inspectScore.hidden = true;
+      inspectEl.hidden = false;
+      if (treeRows[id]) treeRows[id].scrollIntoView({ block: 'nearest' });
+    } else {
+      inspectScore.hidden = false;
+      inspectEl.hidden = true;
+    }
+  }
+
+  function closeOverlayPanelsOnSelect() {
+    if (window.matchMedia('(max-width: 1199.98px)').matches) closePanels();
+  }
+
+  function copyChip(value, label) {
+    return '<code class="copy" data-copy="' + esc(value).replace(/"/g, '&quot;') + '" title="Click to copy">' + esc(label == null ? value : label) + '</code>';
+  }
+
+  function renderInspect(el) {
+    var no = markerNo[el.designId] ? markerNo[el.designId] + '. ' : '';
+    var h = '<button id="fv-back" type="button">\u2190 Back to score <span class="mini-score">' + activeScore + '/100</span></button>';
+    h += '<div class="insp-title">' + no + esc(el.designName) + '</div>';
+    h += '<div class="insp-meta">' + el.role + ' \u00b7 matched by ' + el.matchMethod + '</div>';
+    if (el.selector) h += '<div class="insp-selector">' + copyChip(el.selector) + '</div>';
+    if (!el.matched) {
+      h += '<p class="insp-meta" style="color:var(--critical-ink);font-weight:600;">Missing \u2014 not found in the DOM.</p>';
+      h += '<p class="insp-meta">Expected at x=' + el.designBounds.x + ' y=' + el.designBounds.y + ', ' + el.designBounds.w + '\u00d7' + el.designBounds.h + 'px. See the fix instructions below for the full build spec.</p>';
+    } else if (!el.diffs.length) {
+      h += '<p class="insp-clean">Clean \u2014 no drift beyond tolerances.</p>';
+    } else {
+      el.diffs.forEach(function (d) {
+        h += '<div class="insp-row">';
+        h += '<div class="insp-prop"><span class="dot" style="background:' + SEV_HEX[d.severity] + '"></span>' + esc(d.property) +
+          ' <span style="color:' + SEV_INK[d.severity] + ';font-weight:600;font-size:10px;text-transform:uppercase;">' + d.severity + '</span></div>';
+        h += '<div class="insp-vals">' +
+          '<code>' + (d.actual == null ? '\u2014' : esc(String(d.actual))) + '</code>' +
+          '<span class="arrow">\u2192</span>' +
+          copyChip(String(d.expected)) +
+          '</div>';
+        if (d.delta || d.cascade) {
+          h += '<div class="insp-delta">' + esc(d.delta || '') + (d.cascade ? ' <span class="cascade-tag">(cascade \u2014 fix the parent instead)</span>' : '') + '</div>';
+        }
+        h += '</div>';
+      });
+      h += '<p class="insp-delta" style="margin-top:8px;">Click a value chip to copy the expected CSS value.</p>';
+    }
+    var box = document.getElementById('fv-detail');
+    box.innerHTML = h;
+    document.getElementById('fv-back').addEventListener('click', function () { select(null); });
+  }
+
+  document.getElementById('fv-detail').addEventListener('click', function (e) {
+    var chip = e.target.closest('.copy');
+    if (!chip) return;
+    var val = chip.dataset.copy || chip.textContent;
+    function flash() {
+      chip.classList.add('copied');
+      setTimeout(function () { chip.classList.remove('copied'); }, 900);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(val).then(flash, flash);
+    } else { flash(); }
+    showToast('Copied "' + val + '"');
+  });
+
+  // ---------- filters ----------
+  var hiddenSevs = {};
+  var showCascade = false; // default: hide cascade-only markers, count root diffs only
+  function isCascadeOnly(el) {
+    return el.matched && el.diffs.length > 0 && el.diffs.every(function (d) { return d.cascade; });
+  }
+  function applyFilters() {
+    report.elements.forEach(function (el) {
+      var hide = !!hiddenSevs[worstSeverity(el)] || (!showCascade && isCascadeOnly(el));
+      (regOv[el.designId] || []).forEach(function (n) { n.classList.toggle('flt-hidden', hide); });
+      (regChip[el.designId] || []).forEach(function (n) { n.classList.toggle('flt-hidden', hide); });
+    });
+  }
+  document.getElementById('fv-show-cascade').addEventListener('change', function () {
+    showCascade = this.checked;
+    applyFilters();
+    renderPills();
+  });
+  applyFilters();
+
+  // ---------- companion line + plain-English summary (computed once) ----------
+  function buildSummarySentence() {
+    var missingCount = report.missing.length;
+    var createSteps = instructions.filter(function (i) { return i.kind === 'create'; }).length;
+    var otherSteps = instructions.length - createSteps;
+    var cascadeCount = allDiffs().filter(function (it) { return it.diff.cascade; }).length;
+    if (!missingCount && !otherSteps) {
+      return 'Implementation matches the design within tolerance \u2014 nothing to fix.';
+    }
+    var clauses = [];
+    if (missingCount) clauses.push(missingCount + ' missing element' + (missingCount === 1 ? '' : 's'));
+    if (otherSteps) clauses.push(otherSteps + ' style/layout root cause' + (otherSteps === 1 ? '' : 's'));
+    var sentence = clauses.join(' and ') + '.';
+    if (cascadeCount) {
+      sentence += ' ' + cascadeCount + ' marker diff' + (cascadeCount === 1 ? ' is' : 's are') + ' cascade side effect' + (cascadeCount === 1 ? '' : 's') + '.';
+    }
+    return sentence;
+  }
+  function renderCompanion() {
+    var rc = computeScore('rootCause');
+    var companionText = instructions.length
+      ? 'Root cause ' + rc + '/100 \u00b7 ' + instructions.length + ' ordered fix' + (instructions.length === 1 ? '' : 'es')
+      : 'Root cause ' + rc + '/100 \u00b7 No fixes needed';
+    var summaryText = buildSummarySentence();
+    document.getElementById('fv-companion').textContent = companionText;
+    document.getElementById('fv-summary').textContent = summaryText;
+    document.getElementById('fv-m-companion').textContent = summaryText;
+  }
+  renderCompanion();
+
+  // ---------- severity pills (root-cause counts by default) ----------
+  function renderPills() {
+    var items = allDiffs();
+    var basis = showCascade ? items : items.filter(function (it) { return !it.diff.cascade; });
+    var counts = { critical: 0, high: 0, medium: 0, low: 0 };
+    basis.forEach(function (it) { counts[it.diff.severity]++; });
+    var pills = document.getElementById('fv-sev-pills');
+    pills.innerHTML = '';
+    var any = false;
+    Object.keys(counts).forEach(function (sev) {
+      if (!counts[sev]) return;
+      any = true;
+      var p = document.createElement('span');
+      p.className = 'sev-count' + (hiddenSevs[sev] ? ' off' : '');
+      p.style.color = SEV_INK[sev];
+      p.style.borderColor = SEV_HEX[sev];
+      p.textContent = counts[sev] + ' ' + SEV_LABEL[sev];
+      p.title = 'Click to show/hide these markers';
+      p.addEventListener('click', function () {
+        hiddenSevs[sev] = !hiddenSevs[sev];
+        p.classList.toggle('off', !!hiddenSevs[sev]);
+        applyFilters();
+      });
+      pills.appendChild(p);
+    });
+    if (!any) {
+      var ok = document.createElement('span');
+      ok.className = 'sev-count';
+      ok.style.color = SEV_INK.clean;
+      ok.style.borderColor = SEV_HEX.clean;
+      ok.textContent = 'No issues';
+      pills.appendChild(ok);
+    }
+    document.getElementById('fv-pill-hint').textContent = 'Click a pill to filter markers \u00b7 showing ' + (showCascade ? 'all diffs' : 'root causes');
+  }
+
+  // ---------- category breakdown (never green for a nonzero deduction) ----------
+  function renderCategories(profile) {
+    var items = allDiffs();
+    var discount = profile === 'rootCause';
+    var ch = '';
+    CATEGORIES.forEach(function (cat) {
+      var catDed = 0, n = 0;
+      items.forEach(function (it) {
+        if (cat.props.indexOf(it.diff.property) === -1) return;
+        catDed += ded(it.diff, discount);
+        n++;
+      });
+      catDed = round1(catDed);
+      var c = catColor(catDed);
+      var pct = Math.max(0, Math.min(100, round1(100 - catDed)));
+      ch += '<div class="cat-row"><div class="cat-top"><span>' + cat.name +
+        (n ? ' <span style="color:var(--muted)">\u00b7 ' + n + '</span>' : '') +
+        '</span><span class="cat-val" style="color:' + c.ink + '">' +
+        (catDed ? '\u2212' + catDed : '\u2014') + '</span></div>' +
+        '<div class="cat-bar"><span style="width:' + pct + '%;background:' + c.hex + '"></span></div></div>';
+    });
+    document.getElementById('fv-categories').innerHTML = ch;
+  }
+
+  // ---------- score panel ----------
+  var profileSel = document.getElementById('fv-profile');
+  Object.keys(PROFILES).forEach(function (p) {
+    var opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = PROFILES[p].label + ' \u2014 ' + computeScore(p) + '/100';
+    profileSel.appendChild(opt);
+  });
+  profileSel.value = report.scoringProfile || 'balanced';
+  profileSel.addEventListener('change', renderScore);
+
+  var GAUGE_C = 2 * Math.PI * 40;
+  function renderGauge(score) {
+    var arc = document.getElementById('fv-gauge-arc');
+    arc.style.stroke = gradeHex(score);
+    arc.setAttribute('stroke-dasharray', (GAUGE_C * score / 100) + ' ' + GAUGE_C);
+    document.getElementById('fv-score').textContent = String(score);
+    document.getElementById('fv-grade').textContent = grade(score);
+    document.getElementById('fv-m-score').textContent = String(score);
+    document.getElementById('fv-m-grade').textContent = grade(score);
+    updateMeta(score);
+    activeScore = score;
+  }
+
+  function renderWalkthroughRootFirst(profile) {
+    var discount = profile === 'rootCause';
+    var items = allDiffs();
+    var root = items.filter(function (it) { return !it.diff.cascade; });
+    var cascade = items.filter(function (it) { return it.diff.cascade; });
+    root.sort(function (a, b) { return ded(b.diff, discount) - ded(a.diff, discount); });
+
+    var h = '';
+    var total = 0;
+    root.forEach(function (it) {
+      var v = ded(it.diff, discount);
+      total += v;
+      h += row(it.el.designName + ' \u00b7 ' + it.diff.property, '\u2212' + round1(v));
+    });
+    if (cascade.length) {
+      var cTotal = 0;
+      var inner = '';
+      cascade.forEach(function (it) {
+        var v = ded(it.diff, discount);
+        cTotal += v;
+        inner += row(it.el.designName + ' \u00b7 ' + it.diff.property + (discount ? ' (\u00d70.25)' : ''), '\u2212' + round1(v));
+      });
+      total += cTotal;
+      h += '<details class="bd-group"><summary><span>' + cascade.length + ' cascade side-effect diff' + (cascade.length === 1 ? '' : 's') +
+        (discount ? ' (25% weight)' : ' \u2014 same root cause') + '</span><span class="bd-val">\u2212' + round1(cTotal) + '</span></summary>' +
+        '<div class="bd-group-inner">' + inner + '</div></details>';
+    }
+    if (!items.length) h += '<div class="bd-note">No issues found.</div>';
+    return { html: h, total: total };
+  }
+
+  function renderScore() {
+    var profile = profileSel.value;
+    var score = computeScore(profile);
+    renderGauge(score);
+    renderPills();
+    renderCategories(profile);
+    document.getElementById('fv-profile-desc').textContent = PROFILES[profile].desc;
+
+    var bd = document.getElementById('fv-breakdown');
+    var h = '';
+    if (profile === 'perElement') {
+      report.elements.forEach(function (el) {
+        var t = 0;
+        el.diffs.forEach(function (d) { t += ded(d, false); });
+        var s = el.matched ? Math.max(0, round1(100 - t)) : 0;
+        h += row(el.designName + (el.matched ? '' : ' (missing)'), s + '/100');
+      });
+      h += row('Mean of ' + report.elements.length + ' elements', score + '/100', true);
+    } else {
+      var result = renderWalkthroughRootFirst(profile);
+      h += result.html;
+      h += row('100 \u2212 ' + round1(result.total), String(round1(Math.max(0, 100 - result.total))), true);
+      if (profile === 'strict') {
+        var items = allDiffs();
+        Object.keys(CAPS).forEach(function (sev) {
+          if (items.some(function (it) { return it.diff.severity === sev; })) {
+            h += '<div class="bd-note">has ' + sev + ' issues \u2192 capped at ' + CAPS[sev] + '</div>';
+          }
+        });
+        h += row('Final (after caps)', String(score), true);
+      }
+    }
+    bd.innerHTML = h;
+  }
+  function row(what, val, total) {
+    return '<div class="bd-row' + (total ? ' bd-total' : '') + '"><span class="bd-what">' + esc(what) + '</span><span class="bd-val">' + esc(val) + '</span></div>';
+  }
+  renderScore();
+
+  // ---------- markers on/off ----------
+  var togBtn = document.getElementById('fv-overlay-toggle');
+  togBtn.addEventListener('click', function () {
+    var on = togBtn.getAttribute('aria-pressed') === 'true';
+    togBtn.setAttribute('aria-pressed', on ? 'false' : 'true');
+    togBtn.lastChild.textContent = on ? 'Markers off' : 'Markers on';
+    document.body.classList.toggle('overlays-off', on);
+  });
+
+  // ---------- responsive overlay panels (layers/inspect at ≤1199px) ----------
+  var layersPanel = document.getElementById('fv-layers');
+  var inspectPanel = document.getElementById('fv-inspect');
+  var scrim = document.getElementById('fv-scrim');
+  var btnToggleLayers = document.getElementById('fv-toggle-layers');
+  var btnToggleInspect = document.getElementById('fv-toggle-inspect');
+
+  function closePanels() {
+    layersPanel.classList.remove('open');
+    inspectPanel.classList.remove('open');
+    btnToggleLayers.setAttribute('aria-expanded', 'false');
+    btnToggleInspect.setAttribute('aria-expanded', 'false');
+    scrim.classList.remove('show');
+  }
+  function togglePanel(which) {
+    var panel = which === 'layers' ? layersPanel : inspectPanel;
+    var btn = which === 'layers' ? btnToggleLayers : btnToggleInspect;
+    var willOpen = !panel.classList.contains('open');
+    closePanels();
+    if (willOpen) {
+      panel.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+      scrim.classList.add('show');
+    }
+  }
+  btnToggleLayers.addEventListener('click', function () { togglePanel('layers'); });
+  btnToggleInspect.addEventListener('click', function () { togglePanel('inspect'); });
+  document.getElementById('fv-close-layers').addEventListener('click', closePanels);
+  document.getElementById('fv-close-inspect').addEventListener('click', closePanels);
+  scrim.addEventListener('click', closePanels);
+
+  // ---------- mobile canvas/fixes tabs (≤799px) ----------
+  var tabCanvas = document.getElementById('fv-tab-canvas');
+  var tabFixes = document.getElementById('fv-tab-fixes');
+  tabCanvas.addEventListener('click', function () {
+    document.body.classList.remove('mobile-fixes');
+    tabCanvas.classList.add('active');
+    tabFixes.classList.remove('active');
+  });
+  tabFixes.addEventListener('click', function () {
+    document.body.classList.add('mobile-fixes');
+    tabFixes.classList.add('active');
+    tabCanvas.classList.remove('active');
+    drawer.classList.remove('collapsed');
+    drawerToggle.setAttribute('aria-expanded', 'true');
+  });
+  document.getElementById('fv-tab-fixes-count').textContent = instructions.length ? '(' + instructions.length + ')' : '';
+
+  // ---------- compare modes (accessible radiogroup) ----------
+  var mode = 'side';
+  var swipeP = 0.5;
+  var modeSeg = document.getElementById('fv-mode');
+  var modeButtons = Array.prototype.slice.call(modeSeg.querySelectorAll('button'));
+  var onionGroup = document.getElementById('fv-onion');
+  var onionSlider = document.getElementById('fv-onion-slider');
+  var swipeHandle = document.getElementById('fv-swipe-handle');
+  swipeHandle.style.top = px(-12);
+  swipeHandle.style.height = px(H + 24);
+
+  function updateSwipe() {
+    designBlock.style.clipPath = 'inset(0 ' + ((1 - swipeP) * 100) + '% 0 0)';
+    swipeHandle.style.left = px(swipeP * W - 1);
+    swipeHandle.setAttribute('aria-valuenow', String(Math.round(swipeP * 100)));
+  }
+  function applyMode(m) {
+    mode = m;
+    document.body.classList.remove('mode-side', 'mode-overlay', 'mode-swipe');
+    document.body.classList.add('mode-' + m);
+    modeButtons.forEach(function (b) {
+      var active = b.dataset.mode === m;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-checked', active ? 'true' : 'false');
+      b.tabIndex = active ? 0 : -1;
+    });
+    implBlock.style.left = m === 'side' ? px(W + GAP) : '0px';
+    designBlock.style.zIndex = m === 'side' ? '1' : '2';
+    designBlock.style.opacity = m === 'overlay' ? String(onionSlider.value / 100) : '1';
+    designBlock.style.clipPath = m === 'swipe' ? 'inset(0 ' + ((1 - swipeP) * 100) + '% 0 0)' : 'none';
+    onionGroup.hidden = m !== 'overlay';
+    swipeHandle.hidden = m !== 'swipe';
+    if (m === 'swipe') updateSwipe();
+    fitView();
+  }
+  modeSeg.addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (b && b.dataset.mode) applyMode(b.dataset.mode);
+  });
+  modeSeg.addEventListener('keydown', function (e) {
+    var idx = modeButtons.indexOf(document.activeElement);
+    if (idx === -1) return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      var next = modeButtons[(idx + 1) % modeButtons.length];
+      next.focus(); applyMode(next.dataset.mode);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      var prev = modeButtons[(idx - 1 + modeButtons.length) % modeButtons.length];
+      prev.focus(); applyMode(prev.dataset.mode);
+    }
+  });
+  onionSlider.addEventListener('input', function () {
+    if (mode === 'overlay') designBlock.style.opacity = String(this.value / 100);
+  });
+  swipeHandle.addEventListener('mousedown', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    var startX = e.clientX, startP = swipeP;
+    function move(ev) {
+      swipeP = Math.min(1, Math.max(0, startP + (ev.clientX - startX) / (pz.z * W)));
+      updateSwipe();
+    }
+    function up() {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    }
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  });
+  swipeHandle.addEventListener('keydown', function (e) {
+    if (mode !== 'swipe') return;
+    if (e.key === 'ArrowLeft') { swipeP = Math.max(0, swipeP - 0.02); updateSwipe(); e.preventDefault(); }
+    else if (e.key === 'ArrowRight') { swipeP = Math.min(1, swipeP + 0.02); updateSwipe(); e.preventDefault(); }
+  });
+
+  // ---------- pan / zoom ----------
+  var canvas = document.getElementById('fv-canvas');
+  var world = document.getElementById('fv-world');
+  var pz = { x: 0, y: 0, z: 1 };
+  function applyPz() {
+    world.style.transform = 'translate(' + pz.x + 'px,' + pz.y + 'px) scale(' + pz.z + ')';
+    document.getElementById('fv-zoom').textContent = Math.round(pz.z * 100) + '%';
+  }
+  function bbox() {
+    return { w: mode === 'side' ? 2 * W + GAP : W, h: H };
+  }
+  function fitView() {
+    var r = canvas.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return;
+    var b = bbox();
+    var z = Math.min((r.width - 120) / b.w, (r.height - 120) / b.h);
+    pz.z = Math.min(4, Math.max(0.02, z));
+    pz.x = (r.width - b.w * pz.z) / 2;
+    pz.y = (r.height - b.h * pz.z) / 2 + 8;
+    applyPz();
+  }
+  function zoomAt(cx, cy, factor) {
+    var nz = Math.min(8, Math.max(0.05, pz.z * factor));
+    pz.x = cx - (cx - pz.x) * (nz / pz.z);
+    pz.y = cy - (cy - pz.y) * (nz / pz.z);
+    pz.z = nz;
+    applyPz();
+  }
+  canvas.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var r = canvas.getBoundingClientRect();
+    if (e.ctrlKey || e.metaKey) {
+      zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.01));
+    } else {
+      pz.x -= e.deltaX;
+      pz.y -= e.deltaY;
+      applyPz();
+    }
+  }, { passive: false });
+  canvas.addEventListener('mousedown', function (e) {
+    if (e.target.closest('.fv-ov, .fv-chip, #fv-swipe-handle')) return;
+    e.preventDefault();
+    var sx = e.clientX, sy = e.clientY, ox = pz.x, oy = pz.y, moved = false;
+    canvas.classList.add('panning');
+    function move(ev) {
+      var dx = ev.clientX - sx, dy = ev.clientY - sy;
+      if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+      pz.x = ox + dx; pz.y = oy + dy;
+      applyPz();
+    }
+    function up() {
+      canvas.classList.remove('panning');
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      if (!moved) select(null);
+    }
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  });
+  function zoomCenter(factor) {
+    var r = canvas.getBoundingClientRect();
+    zoomAt(r.width / 2, r.height / 2, factor);
+  }
+  document.getElementById('fv-zoom-in').addEventListener('click', function () { zoomCenter(1.25); });
+  document.getElementById('fv-zoom-out').addEventListener('click', function () { zoomCenter(0.8); });
+  document.getElementById('fv-zoom-fit').addEventListener('click', fitView);
+  document.getElementById('fv-zoom-100').addEventListener('click', function () {
+    var r = canvas.getBoundingClientRect();
+    var b = bbox();
+    pz.z = 1;
+    pz.x = (r.width - b.w) / 2;
+    pz.y = 24;
+    applyPz();
+  });
+  document.addEventListener('keydown', function (e) {
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+    if (e.key === '+' || e.key === '=') zoomCenter(1.25);
+    else if (e.key === '-') zoomCenter(0.8);
+    else if (e.key === '0') fitView();
+    else if (e.key === '1') document.getElementById('fv-zoom-100').click();
+    else if (e.key === 'Escape') { select(null); closePanels(); }
+  });
+  window.addEventListener('resize', fitView);
+
+  // ---------- fix instructions drawer ----------
+  var drawer = document.getElementById('fv-drawer');
+  var drawerToggle = document.getElementById('fv-drawer-toggle');
+  var drawerBody = document.getElementById('fv-drawer-body');
+  var drawerResize = document.getElementById('fv-drawer-resize');
+  var insBox = document.getElementById('fv-instructions');
+  drawerToggle.addEventListener('click', function () {
+    var collapsed = drawer.classList.toggle('collapsed');
+    drawerToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  });
+
+  // Drag the top edge of the drawer to give more/less space to the canvas tools.
+  (function setupDrawerResize() {
+    var minH = 80;
+    function maxH() { return Math.max(minH + 40, Math.round(window.innerHeight * 0.7)); }
+    function setH(px) {
+      var h = Math.max(minH, Math.min(maxH(), px));
+      drawerBody.style.setProperty('--drawer-h', h + 'px');
+      drawerBody.style.height = h + 'px';
+      fitView();
+    }
+    function startDrag(clientY) {
+      var startY = clientY;
+      var startH = drawerBody.getBoundingClientRect().height;
+      document.body.classList.add('drawer-resizing');
+      function move(ev) {
+        var y = ev.touches ? ev.touches[0].clientY : ev.clientY;
+        // Dragging the handle down shrinks the drawer (more room for the tools above).
+        setH(startH - (y - startY));
+        if (ev.cancelable) ev.preventDefault();
+      }
+      function up() {
+        document.body.classList.remove('drawer-resizing');
+        window.removeEventListener('mousemove', move);
+        window.removeEventListener('mouseup', up);
+        window.removeEventListener('touchmove', move);
+        window.removeEventListener('touchend', up);
+      }
+      window.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', up);
+      window.addEventListener('touchmove', move, { passive: false });
+      window.addEventListener('touchend', up);
+    }
+    drawerResize.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      startDrag(e.clientY);
+    });
+    drawerResize.addEventListener('touchstart', function (e) {
+      if (!e.touches.length) return;
+      startDrag(e.touches[0].clientY);
+    }, { passive: true });
+    drawerResize.addEventListener('keydown', function (e) {
+      var cur = drawerBody.getBoundingClientRect().height;
+      if (e.key === 'ArrowUp') { setH(cur + 24); e.preventDefault(); }
+      else if (e.key === 'ArrowDown') { setH(cur - 24); e.preventDefault(); }
+    });
+  })();
+  var countBadge = document.getElementById('fv-drawer-count');
+  countBadge.textContent = instructions.length ? instructions.length + ' step' + (instructions.length > 1 ? 's' : '') : 'none needed';
+  if (!instructions.length) {
+    insBox.innerHTML = '<p style="color:var(--clean-ink);font-weight:600;">No fixes needed \u2014 the implementation matches the design within tolerances.</p>';
+    document.getElementById('fv-copy-ins').style.display = 'none';
+  } else {
+    var oh = '<ol>';
+    instructions.forEach(function (ins) {
+      oh += '<li><span class="kind-pill">' + esc(ins.kind) + '</span>' + esc(ins.summary);
+      if (ins.details.length) {
+        oh += '<ul class="ins-details">';
+        ins.details.forEach(function (d) { oh += '<li>' + esc(d) + '</li>'; });
+        oh += '</ul>';
+      }
+      if (ins.note) oh += '<div class="ins-note">' + esc(ins.note) + '</div>';
+      oh += '</li>';
+    });
+    oh += '</ol>';
+    insBox.innerHTML = oh;
+
+    document.getElementById('fv-copy-ins').addEventListener('click', function () {
+      var currentScore = computeScore(profileSel.value);
+      var lines = [];
+      lines.push('The implementation at ' + (report.liveUrl || 'the live URL') +
+        ' drifts from the Figma design "' + report.frameName + '" (fidelity ' + currentScore + '/100, ' + PROFILES[profileSel.value].label.toLowerCase() + ' profile).');
+      lines.push('Apply the following ' + instructions.length + ' fix' + (instructions.length > 1 ? 'es' : '') + ' in order, then re-run verify_implementation until the score is 100:');
+      lines.push('');
+      instructions.forEach(function (ins) {
+        lines.push(ins.step + '. ' + ins.summary);
+        ins.details.forEach(function (d) { lines.push('   - ' + d); });
+        if (ins.note) lines.push('   Note: ' + ins.note);
+      });
+      var text = lines.join('\n');
+      var btn = this;
+      function done(ok) {
+        btn.textContent = ok ? 'Copied!' : 'Copy failed';
+        showToast(ok ? 'Copied agent prompt to clipboard' : 'Copy failed \u2014 select and copy manually');
+        setTimeout(function () { btn.textContent = 'Copy as agent prompt'; }, 1600);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(true); } catch (err) { done(false); }
+        document.body.removeChild(ta);
+      }
+    });
+  }
+
+  // ---------- init ----------
+  applyMode('side');
+  requestAnimationFrame(fitView);
+})();
+</script>
 </body>
 </html>

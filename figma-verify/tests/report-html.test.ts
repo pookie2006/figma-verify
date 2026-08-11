@@ -103,11 +103,31 @@ describe("renderHtmlReport", () => {
     expect(noShot).toContain('"screenshot":null');
   });
 
-  it("has a single accessible h1 naming the report and frame", () => {
+  it("has a single accessible h1 naming the product", () => {
     const h1Matches = html.match(/<h1[\s>]/g) ?? [];
     expect(h1Matches).toHaveLength(1);
     expect(html).toContain("Figma Verify");
-    expect(html).toContain("report — Test Frame");
+  });
+
+  it("puts the score panel before the layers panel in the DOM (score left, layers right)", () => {
+    const inspectAt = html.indexOf('id="fv-inspect"');
+    const layersAt = html.indexOf('id="fv-layers"');
+    expect(inspectAt).toBeGreaterThan(-1);
+    expect(layersAt).toBeGreaterThan(inspectAt);
+  });
+
+  it("exposes code-folder and Figma-mockup inserters in the toolbar", () => {
+    expect(html).toContain('id="fv-code-input"');
+    expect(html).toContain("webkitdirectory");
+    expect(html).toContain('id="fv-figma-input"');
+    expect(html).toContain("Code folder");
+    expect(html).toContain("Figma mockup");
+  });
+
+  it("includes a resizable handle on the fix-instructions drawer", () => {
+    expect(html).toContain('id="fv-drawer-resize"');
+    expect(html).toContain('role="separator"');
+    expect(html).toContain("setupDrawerResize");
   });
 
   it("does not clone Figma's rainbow brand mark", () => {

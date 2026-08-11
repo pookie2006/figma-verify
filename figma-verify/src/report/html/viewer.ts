@@ -115,13 +115,67 @@ export const VIEWER_JS = `
   }
 
   // ---------- toolbar meta ----------
+  var sources = { code: null, figma: null };
   function updateMeta(score) {
     var meta = document.getElementById('fv-meta');
     meta.innerHTML = '<strong>' + esc(frame.name) + '</strong>' +
       '<span class="meta-sep">\\u00b7</span>Fidelity <strong>' + score + '</strong>/100' +
       '<span class="meta-sep">\\u00b7</span><span class="agent-chip">Agent-loop ready</span>';
-    meta.title = (report.liveUrl || 'no live URL') + '  \\u00b7  viewport ' + report.viewportWidth + 'px  \\u00b7  generated ' + report.generatedAt;
+    var srcBits = [];
+    if (sources.code) srcBits.push('code: ' + sources.code);
+    if (sources.figma) srcBits.push('figma: ' + sources.figma);
+    meta.title = (srcBits.length ? srcBits.join('  \\u00b7  ') + '  \\u00b7  ' : '') +
+      (report.liveUrl || 'no live URL') + '  \\u00b7  viewport ' + report.viewportWidth + 'px  \\u00b7  generated ' + report.generatedAt;
   }
+
+  // ---------- source inserters (code folder + Figma mockup) ----------
+  var codeInput = document.getElementById('fv-code-input');
+  var figmaInput = document.getElementById('fv-figma-input');
+  var codeValue = document.getElementById('fv-code-value');
+  var figmaValue = document.getElementById('fv-figma-value');
+  var codeInserter = document.getElementById('fv-code-inserter');
+  var figmaInserter = document.getElementById('fv-figma-inserter');
+
+  codeInput.addEventListener('change', function () {
+    var files = Array.prototype.slice.call(codeInput.files || []);
+    if (!files.length) return;
+    var root = '';
+    var firstPath = files[0].webkitRelativePath || files[0].name;
+    if (firstPath.indexOf('/') !== -1) root = firstPath.split('/')[0];
+    else root = files[0].name;
+    sources.code = root + ' (' + files.length + ' file' + (files.length === 1 ? '' : 's') + ')';
+    codeValue.textContent = sources.code;
+    codeInserter.classList.add('has-file');
+    showToast('Loaded code folder \\u2014 ' + sources.code);
+    updateMeta(activeScore);
+  });
+
+  figmaInput.addEventListener('change', function () {
+    var file = (figmaInput.files || [])[0];
+    if (!file) return;
+    sources.figma = file.name;
+    figmaValue.textContent = file.name;
+    figmaInserter.classList.add('has-file');
+    // If the mockup is an image, optionally preview it as a ghost on the design stage.
+    if (file.type && file.type.indexOf('image/') === 0) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        var old = document.getElementById('fv-mockup-preview');
+        if (old) old.remove();
+        var img = document.createElement('img');
+        img.id = 'fv-mockup-preview';
+        img.alt = 'Uploaded Figma mockup preview';
+        img.src = String(reader.result);
+        img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0.35;pointer-events:none;z-index:1;';
+        designStage.appendChild(img);
+        showToast('Loaded Figma mockup \\u2014 ' + file.name);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      showToast('Loaded Figma mockup \\u2014 ' + file.name);
+    }
+    updateMeta(activeScore);
+  });
 
   // ---------- frames + stage content ----------
   var designBlock = document.getElementById('fv-design-block');
@@ -828,11 +882,60 @@ export const VIEWER_JS = `
   // ---------- fix instructions drawer ----------
   var drawer = document.getElementById('fv-drawer');
   var drawerToggle = document.getElementById('fv-drawer-toggle');
+  var drawerBody = document.getElementById('fv-drawer-body');
+  var drawerResize = document.getElementById('fv-drawer-resize');
   var insBox = document.getElementById('fv-instructions');
   drawerToggle.addEventListener('click', function () {
     var collapsed = drawer.classList.toggle('collapsed');
     drawerToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
   });
+
+  // Drag the top edge of the drawer to give more/less space to the canvas tools.
+  (function setupDrawerResize() {
+    var minH = 80;
+    function maxH() { return Math.max(minH + 40, Math.round(window.innerHeight * 0.7)); }
+    function setH(px) {
+      var h = Math.max(minH, Math.min(maxH(), px));
+      drawerBody.style.setProperty('--drawer-h', h + 'px');
+      drawerBody.style.height = h + 'px';
+      fitView();
+    }
+    function startDrag(clientY) {
+      var startY = clientY;
+      var startH = drawerBody.getBoundingClientRect().height;
+      document.body.classList.add('drawer-resizing');
+      function move(ev) {
+        var y = ev.touches ? ev.touches[0].clientY : ev.clientY;
+        // Dragging the handle down shrinks the drawer (more room for the tools above).
+        setH(startH - (y - startY));
+        if (ev.cancelable) ev.preventDefault();
+      }
+      function up() {
+        document.body.classList.remove('drawer-resizing');
+        window.removeEventListener('mousemove', move);
+        window.removeEventListener('mouseup', up);
+        window.removeEventListener('touchmove', move);
+        window.removeEventListener('touchend', up);
+      }
+      window.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', up);
+      window.addEventListener('touchmove', move, { passive: false });
+      window.addEventListener('touchend', up);
+    }
+    drawerResize.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      startDrag(e.clientY);
+    });
+    drawerResize.addEventListener('touchstart', function (e) {
+      if (!e.touches.length) return;
+      startDrag(e.touches[0].clientY);
+    }, { passive: true });
+    drawerResize.addEventListener('keydown', function (e) {
+      var cur = drawerBody.getBoundingClientRect().height;
+      if (e.key === 'ArrowUp') { setH(cur + 24); e.preventDefault(); }
+      else if (e.key === 'ArrowDown') { setH(cur - 24); e.preventDefault(); }
+    });
+  })();
   var countBadge = document.getElementById('fv-drawer-count');
   countBadge.textContent = instructions.length ? instructions.length + ' step' + (instructions.length > 1 ? 's' : '') : 'none needed';
   if (!instructions.length) {

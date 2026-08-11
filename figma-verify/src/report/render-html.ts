@@ -14,14 +14,11 @@ export interface HtmlReportInput {
  * Render a fully self-contained interactive HTML report: no external
  * resources, all data embedded as JSON, viewer logic inlined.
  *
- * Information architecture (first paint, in order): the fidelity score for
- * the active profile, a root-cause companion line, a one-sentence plain
- * English summary, severity pills (root-cause counts by default), the
- * design/implementation canvas, and — open by default whenever there is
- * anything to fix — the ordered agent fix instructions. A layers tree and
- * a contextual per-element inspector round out the workspace. The layout
- * collapses to overlay drawers at ≤1199px and a single-column mobile view
- * with a sticky score header and a canvas/fixes tab bar at ≤799px.
+ * Layout (desktop): score/inspect rail on the left, pannable canvas in the
+ * center, layers tree on the right. A vertically resizable bottom drawer
+ * holds the agent fix instructions. The toolbar includes two source
+ * inserters (code folder + Figma mockup) so the report reads as the app
+ * entry point rather than a secondary landing page.
  */
 export function renderHtmlReport(input: HtmlReportInput): string {
   const { report } = input;
@@ -52,10 +49,23 @@ export function renderHtmlReport(input: HtmlReportInput): string {
       <path d="M5.6 10.4l3 3 6-6.8" fill="none" stroke="var(--accent)" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
     <span>Figma Verify</span>
-    <span class="brand-frame">report — ${escapeHtml(report.frameName)}</span>
   </h1>
+  <div class="inserters" role="group" aria-label="Source inputs">
+    <label class="inserter" id="fv-code-inserter" title="Select the folder with your implementation files">
+      <input type="file" id="fv-code-input" webkitdirectory multiple hidden />
+      <svg class="inserter-ic" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5h5l1.5 1.5H14.5v8H1.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      <span class="inserter-kicker">Code folder</span>
+      <span class="inserter-value" id="fv-code-value">Choose folder…</span>
+    </label>
+    <label class="inserter" id="fv-figma-inserter" title="Select a Figma export, design fixture JSON, or mockup image">
+      <input type="file" id="fv-figma-input" accept=".fig,.json,.png,.jpg,.jpeg,.webp,.svg,image/*,application/json" hidden />
+      <svg class="inserter-ic" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 9l2-2.5 2 1.5L11 5.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="inserter-kicker">Figma mockup</span>
+      <span class="inserter-value" id="fv-figma-value">Choose file…</span>
+    </label>
+  </div>
   <div class="meta" id="fv-meta"></div>
-  <button class="panel-toggle-btn" id="fv-toggle-layers" type="button" aria-expanded="false" aria-controls="fv-layers">Layers</button>
+  <button class="panel-toggle-btn" id="fv-toggle-inspect" type="button" aria-expanded="false" aria-controls="fv-inspect">Score</button>
   <div class="tb-group seg" id="fv-mode" role="radiogroup" aria-label="Compare mode">
     <button type="button" data-mode="side" class="active" role="radio" aria-checked="true" tabindex="0">Side by side</button>
     <button type="button" data-mode="overlay" role="radio" aria-checked="false" tabindex="-1">Overlay</button>
@@ -73,7 +83,7 @@ export function renderHtmlReport(input: HtmlReportInput): string {
     <button type="button" id="fv-zoom-100" title="Actual size (1 key)">100%</button>
   </div>
   <button id="fv-overlay-toggle" type="button" aria-pressed="true"><span class="tog-dot"></span>Markers on</button>
-  <button class="panel-toggle-btn" id="fv-toggle-inspect" type="button" aria-expanded="false" aria-controls="fv-inspect">Inspect</button>
+  <button class="panel-toggle-btn" id="fv-toggle-layers" type="button" aria-expanded="false" aria-controls="fv-layers">Layers</button>
 </header>
 <div id="fv-mobile-topbar">
   <span class="m-grade" id="fv-m-grade"></span>
@@ -81,26 +91,8 @@ export function renderHtmlReport(input: HtmlReportInput): string {
   <span class="m-companion" id="fv-m-companion"></span>
 </div>
 <div id="fv-editor">
-  <aside id="fv-layers">
-    <div class="panel-head">Layers<button class="panel-close" id="fv-close-layers" type="button" aria-label="Close layers panel">&times;</button></div>
-    <div id="fv-tree"></div>
-  </aside>
-  <div id="fv-canvas">
-    <div id="fv-world">
-      <div class="frame-block" id="fv-design-block">
-        <div class="frame-label"><span id="fv-design-label"></span></div>
-        <div class="stage" id="fv-design-stage"></div>
-      </div>
-      <div class="frame-block" id="fv-impl-block">
-        <div class="frame-label"><span id="fv-impl-label"></span></div>
-        <div class="stage" id="fv-impl-stage"></div>
-      </div>
-      <div id="fv-swipe-handle" role="slider" tabindex="0" aria-label="Swipe position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" hidden><div class="grip"></div></div>
-    </div>
-    <div id="fv-legend"></div>
-  </div>
   <aside id="fv-inspect">
-    <div class="panel-head" style="border-bottom:none;">Inspect<button class="panel-close" id="fv-close-inspect" type="button" aria-label="Close inspect panel">&times;</button></div>
+    <div class="panel-head">Score<button class="panel-close" id="fv-close-inspect" type="button" aria-label="Close score panel">&times;</button></div>
     <div id="fv-inspect-score">
       <div class="gauge-wrap">
         <svg id="fv-gauge" viewBox="0 0 96 96" width="116" height="116" aria-hidden="true">
@@ -133,8 +125,27 @@ export function renderHtmlReport(input: HtmlReportInput): string {
       <div id="fv-detail"></div>
     </div>
   </aside>
+  <div id="fv-canvas">
+    <div id="fv-world">
+      <div class="frame-block" id="fv-design-block">
+        <div class="frame-label"><span id="fv-design-label"></span></div>
+        <div class="stage" id="fv-design-stage"></div>
+      </div>
+      <div class="frame-block" id="fv-impl-block">
+        <div class="frame-label"><span id="fv-impl-label"></span></div>
+        <div class="stage" id="fv-impl-stage"></div>
+      </div>
+      <div id="fv-swipe-handle" role="slider" tabindex="0" aria-label="Swipe position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" hidden><div class="grip"></div></div>
+    </div>
+    <div id="fv-legend"></div>
+  </div>
+  <aside id="fv-layers">
+    <div class="panel-head">Layers<button class="panel-close" id="fv-close-layers" type="button" aria-label="Close layers panel">&times;</button></div>
+    <div id="fv-tree"></div>
+  </aside>
 </div>
 <div id="fv-drawer" class="${hasFixes ? "" : "collapsed"}">
+  <div id="fv-drawer-resize" role="separator" aria-orientation="horizontal" aria-label="Resize fix instructions panel" tabindex="0" title="Drag to resize"></div>
   <div class="drawer-head">
     <button id="fv-drawer-toggle" type="button" aria-expanded="${hasFixes ? "true" : "false"}" aria-controls="fv-drawer-body">
       <span class="chev">&#9662;</span>
