@@ -3,7 +3,10 @@
  *
  * Runs entirely client-side with zero dependencies: pan/zoom canvas, three
  * compare modes (side-by-side / onion-skin overlay / swipe), a layers tree,
- * a contextual inspect panel, severity filtering, and live score profiles.
+ * a contextual inspect panel, root-cause-first severity summaries, and live
+ * score profiles. Also drives the responsive overlay panels / mobile tab
+ * bar and small accessibility affordances (radiogroup + slider roles,
+ * a copy toast).
  *
  * NOTE: this string is embedded in a <script> tag, so it must not contain
  * backticks or "$" + "{" sequences.
@@ -20,8 +23,8 @@ export const VIEWER_JS = `
   var DEDUCTIONS = { critical: 15, high: 5, medium: 2, low: 0.5 };
   var CASCADE_DISCOUNT = 0.25;
   var CAPS = { critical: 40, high: 75 };
-  var SEV_HEX = { critical: '#F24822', high: '#FFA629', medium: '#FFCD29', low: '#9747FF', clean: '#14AE5C' };
-  var SEV_INK = { critical: '#D2361E', high: '#B96A00', medium: '#8F6C00', low: '#7B3FE4', clean: '#0E8A4C' };
+  var SEV_HEX = { critical: '#F0472A', high: '#E8890C', medium: '#C99A02', low: '#8B5CF6', clean: '#12966B' };
+  var SEV_INK = { critical: '#C3341C', high: '#A8620A', medium: '#8A6C00', low: '#6D3FD6', clean: '#0B7A56' };
   var SEV_LABEL = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' };
   var CHIP_DARK = { medium: true, high: true };
   var PROFILES = {
@@ -82,8 +85,12 @@ export const VIEWER_JS = `
   function gradeHex(score) {
     return score >= 80 ? SEV_HEX.clean : score >= 60 ? SEV_HEX.medium : score >= 40 ? SEV_HEX.high : SEV_HEX.critical;
   }
-  function gradeInk(score) {
-    return score >= 80 ? SEV_INK.clean : score >= 60 ? SEV_INK.medium : score >= 40 ? SEV_INK.high : SEV_INK.critical;
+  /** Category deduction color: never "healthy green" when a category has any deduction. */
+  function catColor(catDed) {
+    if (catDed <= 0) return { hex: SEV_HEX.clean, ink: SEV_INK.clean };
+    if (catDed >= 15) return { hex: SEV_HEX.critical, ink: SEV_INK.critical };
+    if (catDed >= 5) return { hex: SEV_HEX.high, ink: SEV_INK.high };
+    return { hex: SEV_HEX.medium, ink: SEV_INK.medium };
   }
   function worstSeverity(el) {
     if (!el.matched) return 'critical';
@@ -95,9 +102,26 @@ export const VIEWER_JS = `
   }
   var reportById = {};
   report.elements.forEach(function (el) { reportById[el.designId] = el; });
+  var instructions = report.fixInstructions || [];
 
-  document.getElementById('fv-meta').textContent =
-    report.frameName + '  \\u00b7  ' + (report.liveUrl || '') + '  \\u00b7  viewport ' + report.viewportWidth + 'px  \\u00b7  ' + report.generatedAt;
+  // ---------- toast ----------
+  var toastTimer;
+  function showToast(msg) {
+    var t = document.getElementById('fv-toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
+  }
+
+  // ---------- toolbar meta ----------
+  function updateMeta(score) {
+    var meta = document.getElementById('fv-meta');
+    meta.innerHTML = '<strong>' + esc(frame.name) + '</strong>' +
+      '<span class="meta-sep">\\u00b7</span>Fidelity <strong>' + score + '</strong>/100' +
+      '<span class="meta-sep">\\u00b7</span><span class="agent-chip">Agent-loop ready</span>';
+    meta.title = (report.liveUrl || 'no live URL') + '  \\u00b7  viewport ' + report.viewportWidth + 'px  \\u00b7  generated ' + report.generatedAt;
+  }
 
   // ---------- frames + stage content ----------
   var designBlock = document.getElementById('fv-design-block');
@@ -137,6 +161,7 @@ export const VIEWER_JS = `
     var img = document.createElement('img');
     img.src = 'data:image/png;base64,' + payload.screenshot;
     img.width = W;
+    img.alt = 'Screenshot of the live implementation of ' + frame.name;
     implStage.appendChild(img);
   } else {
     implStage.style.background = '#fafafa';
@@ -241,7 +266,7 @@ export const VIEWER_JS = `
       mk.className = 'mk' + (CHIP_DARK[sev] ? ' chip-dark' : '');
       mk.textContent = String(markerNo[el.id]);
       mk.style.background = SEV_HEX[sev];
-      if (CHIP_DARK[sev]) mk.style.color = '#1E1E1E';
+      if (CHIP_DARK[sev]) mk.style.color = '#1A1B1E';
       row.appendChild(mk);
     }
     if (rep) {
@@ -251,7 +276,7 @@ export const VIEWER_JS = `
       row.appendChild(dot);
       row.dataset.designId = el.id;
       treeRows[el.id] = row;
-      row.addEventListener('click', function () { select(el.id); });
+      row.addEventListener('click', function () { select(el.id); closeOverlayPanelsOnSelect(); });
       row.addEventListener('mouseenter', function () { setHover(el.id, true); });
       row.addEventListener('mouseleave', function () { setHover(el.id, false); });
     }
@@ -276,6 +301,7 @@ export const VIEWER_JS = `
   var selectedId = null;
   var inspectScore = document.getElementById('fv-inspect-score');
   var inspectEl = document.getElementById('fv-inspect-el');
+  var activeScore = report.fidelityScore;
 
   function clearGhost() {
     var g = document.getElementById('fv-ghost');
@@ -323,13 +349,17 @@ export const VIEWER_JS = `
     }
   }
 
+  function closeOverlayPanelsOnSelect() {
+    if (window.matchMedia('(max-width: 1199.98px)').matches) closePanels();
+  }
+
   function copyChip(value, label) {
     return '<code class="copy" data-copy="' + esc(value).replace(/"/g, '&quot;') + '" title="Click to copy">' + esc(label == null ? value : label) + '</code>';
   }
 
   function renderInspect(el) {
     var no = markerNo[el.designId] ? markerNo[el.designId] + '. ' : '';
-    var h = '<button id="fv-back" type="button">\\u2190 Back to score</button>';
+    var h = '<button id="fv-back" type="button">\\u2190 Back to score <span class="mini-score">' + activeScore + '/100</span></button>';
     h += '<div class="insp-title">' + no + esc(el.designName) + '</div>';
     h += '<div class="insp-meta">' + el.role + ' \\u00b7 matched by ' + el.matchMethod + '</div>';
     if (el.selector) h += '<div class="insp-selector">' + copyChip(el.selector) + '</div>';
@@ -371,54 +401,65 @@ export const VIEWER_JS = `
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(val).then(flash, flash);
     } else { flash(); }
+    showToast('Copied "' + val + '"');
   });
 
   // ---------- filters ----------
   var hiddenSevs = {};
-  var hideCascade = false;
+  var showCascade = false; // default: hide cascade-only markers, count root diffs only
   function isCascadeOnly(el) {
     return el.matched && el.diffs.length > 0 && el.diffs.every(function (d) { return d.cascade; });
   }
   function applyFilters() {
     report.elements.forEach(function (el) {
-      var hide = !!hiddenSevs[worstSeverity(el)] || (hideCascade && isCascadeOnly(el));
+      var hide = !!hiddenSevs[worstSeverity(el)] || (!showCascade && isCascadeOnly(el));
       (regOv[el.designId] || []).forEach(function (n) { n.classList.toggle('flt-hidden', hide); });
       (regChip[el.designId] || []).forEach(function (n) { n.classList.toggle('flt-hidden', hide); });
     });
   }
-  document.getElementById('fv-hide-cascade').addEventListener('change', function () {
-    hideCascade = this.checked;
+  document.getElementById('fv-show-cascade').addEventListener('change', function () {
+    showCascade = this.checked;
     applyFilters();
+    renderPills();
   });
+  applyFilters();
 
-  // ---------- score panel ----------
-  var profileSel = document.getElementById('fv-profile');
-  Object.keys(PROFILES).forEach(function (p) {
-    var opt = document.createElement('option');
-    opt.value = p;
-    opt.textContent = PROFILES[p].label + ' \\u2014 ' + computeScore(p) + '/100';
-    profileSel.appendChild(opt);
-  });
-  profileSel.value = report.scoringProfile || 'balanced';
-  profileSel.addEventListener('change', renderScore);
-
-  var GAUGE_C = 2 * Math.PI * 40;
-  function renderGauge(score) {
-    var arc = document.getElementById('fv-gauge-arc');
-    arc.style.stroke = gradeHex(score);
-    arc.setAttribute('stroke-dasharray', (GAUGE_C * score / 100) + ' ' + GAUGE_C);
-    document.getElementById('fv-score').textContent = String(score);
-    document.getElementById('fv-grade').textContent = grade(score);
+  // ---------- companion line + plain-English summary (computed once) ----------
+  function buildSummarySentence() {
+    var missingCount = report.missing.length;
+    var createSteps = instructions.filter(function (i) { return i.kind === 'create'; }).length;
+    var otherSteps = instructions.length - createSteps;
+    var cascadeCount = allDiffs().filter(function (it) { return it.diff.cascade; }).length;
+    if (!missingCount && !otherSteps) {
+      return 'Implementation matches the design within tolerance \\u2014 nothing to fix.';
+    }
+    var clauses = [];
+    if (missingCount) clauses.push(missingCount + ' missing element' + (missingCount === 1 ? '' : 's'));
+    if (otherSteps) clauses.push(otherSteps + ' style/layout root cause' + (otherSteps === 1 ? '' : 's'));
+    var sentence = clauses.join(' and ') + '.';
+    if (cascadeCount) {
+      sentence += ' ' + cascadeCount + ' marker diff' + (cascadeCount === 1 ? ' is' : 's are') + ' cascade side effect' + (cascadeCount === 1 ? '' : 's') + '.';
+    }
+    return sentence;
   }
+  function renderCompanion() {
+    var rc = computeScore('rootCause');
+    var companionText = instructions.length
+      ? 'Root cause ' + rc + '/100 \\u00b7 ' + instructions.length + ' ordered fix' + (instructions.length === 1 ? '' : 'es')
+      : 'Root cause ' + rc + '/100 \\u00b7 No fixes needed';
+    var summaryText = buildSummarySentence();
+    document.getElementById('fv-companion').textContent = companionText;
+    document.getElementById('fv-summary').textContent = summaryText;
+    document.getElementById('fv-m-companion').textContent = summaryText;
+  }
+  renderCompanion();
 
-  function renderSummary(profile) {
+  // ---------- severity pills (root-cause counts by default) ----------
+  function renderPills() {
     var items = allDiffs();
-    var missing = report.elements.filter(function (el) { return !el.matched; }).length;
-    document.getElementById('fv-score-sub').textContent =
-      items.length + ' difference' + (items.length === 1 ? '' : 's') + ' \\u00b7 ' + missing + ' missing element' + (missing === 1 ? '' : 's');
-
+    var basis = showCascade ? items : items.filter(function (it) { return !it.diff.cascade; });
     var counts = { critical: 0, high: 0, medium: 0, low: 0 };
-    items.forEach(function (it) { counts[it.diff.severity]++; });
+    basis.forEach(function (it) { counts[it.diff.severity]++; });
     var pills = document.getElementById('fv-sev-pills');
     pills.innerHTML = '';
     var any = false;
@@ -446,7 +487,12 @@ export const VIEWER_JS = `
       ok.textContent = 'No issues';
       pills.appendChild(ok);
     }
+    document.getElementById('fv-pill-hint').textContent = 'Click a pill to filter markers \\u00b7 showing ' + (showCascade ? 'all diffs' : 'root causes');
+  }
 
+  // ---------- category breakdown (never green for a nonzero deduction) ----------
+  function renderCategories(profile) {
+    var items = allDiffs();
     var discount = profile === 'rootCause';
     var ch = '';
     CATEGORIES.forEach(function (cat) {
@@ -456,21 +502,79 @@ export const VIEWER_JS = `
         catDed += ded(it.diff, discount);
         n++;
       });
-      var catScore = Math.max(0, round1(100 - catDed));
+      catDed = round1(catDed);
+      var c = catColor(catDed);
+      var pct = Math.max(0, Math.min(100, round1(100 - catDed)));
       ch += '<div class="cat-row"><div class="cat-top"><span>' + cat.name +
         (n ? ' <span style="color:var(--muted)">\\u00b7 ' + n + '</span>' : '') +
-        '</span><span class="cat-val" style="color:' + gradeInk(catScore) + '">' +
-        (catDed ? '\\u2212' + round1(catDed) : '100') + '</span></div>' +
-        '<div class="cat-bar"><span style="width:' + catScore + '%;background:' + gradeHex(catScore) + '"></span></div></div>';
+        '</span><span class="cat-val" style="color:' + c.ink + '">' +
+        (catDed ? '\\u2212' + catDed : '\\u2014') + '</span></div>' +
+        '<div class="cat-bar"><span style="width:' + pct + '%;background:' + c.hex + '"></span></div></div>';
     });
     document.getElementById('fv-categories').innerHTML = ch;
+  }
+
+  // ---------- score panel ----------
+  var profileSel = document.getElementById('fv-profile');
+  Object.keys(PROFILES).forEach(function (p) {
+    var opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = PROFILES[p].label + ' \\u2014 ' + computeScore(p) + '/100';
+    profileSel.appendChild(opt);
+  });
+  profileSel.value = report.scoringProfile || 'balanced';
+  profileSel.addEventListener('change', renderScore);
+
+  var GAUGE_C = 2 * Math.PI * 40;
+  function renderGauge(score) {
+    var arc = document.getElementById('fv-gauge-arc');
+    arc.style.stroke = gradeHex(score);
+    arc.setAttribute('stroke-dasharray', (GAUGE_C * score / 100) + ' ' + GAUGE_C);
+    document.getElementById('fv-score').textContent = String(score);
+    document.getElementById('fv-grade').textContent = grade(score);
+    document.getElementById('fv-m-score').textContent = String(score);
+    document.getElementById('fv-m-grade').textContent = grade(score);
+    updateMeta(score);
+    activeScore = score;
+  }
+
+  function renderWalkthroughRootFirst(profile) {
+    var discount = profile === 'rootCause';
+    var items = allDiffs();
+    var root = items.filter(function (it) { return !it.diff.cascade; });
+    var cascade = items.filter(function (it) { return it.diff.cascade; });
+    root.sort(function (a, b) { return ded(b.diff, discount) - ded(a.diff, discount); });
+
+    var h = '';
+    var total = 0;
+    root.forEach(function (it) {
+      var v = ded(it.diff, discount);
+      total += v;
+      h += row(it.el.designName + ' \\u00b7 ' + it.diff.property, '\\u2212' + round1(v));
+    });
+    if (cascade.length) {
+      var cTotal = 0;
+      var inner = '';
+      cascade.forEach(function (it) {
+        var v = ded(it.diff, discount);
+        cTotal += v;
+        inner += row(it.el.designName + ' \\u00b7 ' + it.diff.property + (discount ? ' (\\u00d70.25)' : ''), '\\u2212' + round1(v));
+      });
+      total += cTotal;
+      h += '<details class="bd-group"><summary><span>' + cascade.length + ' cascade side-effect diff' + (cascade.length === 1 ? '' : 's') +
+        (discount ? ' (25% weight)' : ' \\u2014 same root cause') + '</span><span class="bd-val">\\u2212' + round1(cTotal) + '</span></summary>' +
+        '<div class="bd-group-inner">' + inner + '</div></details>';
+    }
+    if (!items.length) h += '<div class="bd-note">No issues found.</div>';
+    return { html: h, total: total };
   }
 
   function renderScore() {
     var profile = profileSel.value;
     var score = computeScore(profile);
     renderGauge(score);
-    renderSummary(profile);
+    renderPills();
+    renderCategories(profile);
     document.getElementById('fv-profile-desc').textContent = PROFILES[profile].desc;
 
     var bd = document.getElementById('fv-breakdown');
@@ -484,21 +588,13 @@ export const VIEWER_JS = `
       });
       h += row('Mean of ' + report.elements.length + ' elements', score + '/100', true);
     } else {
-      var discount = profile === 'rootCause';
-      var total = 0;
-      allDiffs().forEach(function (it) {
-        var v = ded(it.diff, discount);
-        total += v;
-        h += row(
-          it.el.designName + ' \\u00b7 ' + it.diff.property + (it.diff.cascade && discount ? ' (cascade \\u00d70.25)' : ''),
-          '\\u2212' + round1(v)
-        );
-      });
-      if (!allDiffs().length) h += '<div class="bd-note">No issues found.</div>';
-      h += row('100 \\u2212 ' + round1(total), String(round1(Math.max(0, 100 - total))), true);
+      var result = renderWalkthroughRootFirst(profile);
+      h += result.html;
+      h += row('100 \\u2212 ' + round1(result.total), String(round1(Math.max(0, 100 - result.total))), true);
       if (profile === 'strict') {
+        var items = allDiffs();
         Object.keys(CAPS).forEach(function (sev) {
-          if (allDiffs().some(function (it) { return it.diff.severity === sev; })) {
+          if (items.some(function (it) { return it.diff.severity === sev; })) {
             h += '<div class="bd-note">has ' + sev + ' issues \\u2192 capped at ' + CAPS[sev] + '</div>';
           }
         });
@@ -521,10 +617,59 @@ export const VIEWER_JS = `
     document.body.classList.toggle('overlays-off', on);
   });
 
-  // ---------- compare modes ----------
+  // ---------- responsive overlay panels (layers/inspect at ≤1199px) ----------
+  var layersPanel = document.getElementById('fv-layers');
+  var inspectPanel = document.getElementById('fv-inspect');
+  var scrim = document.getElementById('fv-scrim');
+  var btnToggleLayers = document.getElementById('fv-toggle-layers');
+  var btnToggleInspect = document.getElementById('fv-toggle-inspect');
+
+  function closePanels() {
+    layersPanel.classList.remove('open');
+    inspectPanel.classList.remove('open');
+    btnToggleLayers.setAttribute('aria-expanded', 'false');
+    btnToggleInspect.setAttribute('aria-expanded', 'false');
+    scrim.classList.remove('show');
+  }
+  function togglePanel(which) {
+    var panel = which === 'layers' ? layersPanel : inspectPanel;
+    var btn = which === 'layers' ? btnToggleLayers : btnToggleInspect;
+    var willOpen = !panel.classList.contains('open');
+    closePanels();
+    if (willOpen) {
+      panel.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+      scrim.classList.add('show');
+    }
+  }
+  btnToggleLayers.addEventListener('click', function () { togglePanel('layers'); });
+  btnToggleInspect.addEventListener('click', function () { togglePanel('inspect'); });
+  document.getElementById('fv-close-layers').addEventListener('click', closePanels);
+  document.getElementById('fv-close-inspect').addEventListener('click', closePanels);
+  scrim.addEventListener('click', closePanels);
+
+  // ---------- mobile canvas/fixes tabs (≤799px) ----------
+  var tabCanvas = document.getElementById('fv-tab-canvas');
+  var tabFixes = document.getElementById('fv-tab-fixes');
+  tabCanvas.addEventListener('click', function () {
+    document.body.classList.remove('mobile-fixes');
+    tabCanvas.classList.add('active');
+    tabFixes.classList.remove('active');
+  });
+  tabFixes.addEventListener('click', function () {
+    document.body.classList.add('mobile-fixes');
+    tabFixes.classList.add('active');
+    tabCanvas.classList.remove('active');
+    drawer.classList.remove('collapsed');
+    drawerToggle.setAttribute('aria-expanded', 'true');
+  });
+  document.getElementById('fv-tab-fixes-count').textContent = instructions.length ? '(' + instructions.length + ')' : '';
+
+  // ---------- compare modes (accessible radiogroup) ----------
   var mode = 'side';
   var swipeP = 0.5;
   var modeSeg = document.getElementById('fv-mode');
+  var modeButtons = Array.prototype.slice.call(modeSeg.querySelectorAll('button'));
   var onionGroup = document.getElementById('fv-onion');
   var onionSlider = document.getElementById('fv-onion-slider');
   var swipeHandle = document.getElementById('fv-swipe-handle');
@@ -534,13 +679,17 @@ export const VIEWER_JS = `
   function updateSwipe() {
     designBlock.style.clipPath = 'inset(0 ' + ((1 - swipeP) * 100) + '% 0 0)';
     swipeHandle.style.left = px(swipeP * W - 1);
+    swipeHandle.setAttribute('aria-valuenow', String(Math.round(swipeP * 100)));
   }
   function applyMode(m) {
     mode = m;
     document.body.classList.remove('mode-side', 'mode-overlay', 'mode-swipe');
     document.body.classList.add('mode-' + m);
-    Array.prototype.forEach.call(modeSeg.querySelectorAll('button'), function (b) {
-      b.classList.toggle('active', b.dataset.mode === m);
+    modeButtons.forEach(function (b) {
+      var active = b.dataset.mode === m;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-checked', active ? 'true' : 'false');
+      b.tabIndex = active ? 0 : -1;
     });
     implBlock.style.left = m === 'side' ? px(W + GAP) : '0px';
     designBlock.style.zIndex = m === 'side' ? '1' : '2';
@@ -554,6 +703,19 @@ export const VIEWER_JS = `
   modeSeg.addEventListener('click', function (e) {
     var b = e.target.closest('button');
     if (b && b.dataset.mode) applyMode(b.dataset.mode);
+  });
+  modeSeg.addEventListener('keydown', function (e) {
+    var idx = modeButtons.indexOf(document.activeElement);
+    if (idx === -1) return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      var next = modeButtons[(idx + 1) % modeButtons.length];
+      next.focus(); applyMode(next.dataset.mode);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      var prev = modeButtons[(idx - 1 + modeButtons.length) % modeButtons.length];
+      prev.focus(); applyMode(prev.dataset.mode);
+    }
   });
   onionSlider.addEventListener('input', function () {
     if (mode === 'overlay') designBlock.style.opacity = String(this.value / 100);
@@ -572,6 +734,11 @@ export const VIEWER_JS = `
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
   });
+  swipeHandle.addEventListener('keydown', function (e) {
+    if (mode !== 'swipe') return;
+    if (e.key === 'ArrowLeft') { swipeP = Math.max(0, swipeP - 0.02); updateSwipe(); e.preventDefault(); }
+    else if (e.key === 'ArrowRight') { swipeP = Math.min(1, swipeP + 0.02); updateSwipe(); e.preventDefault(); }
+  });
 
   // ---------- pan / zoom ----------
   var canvas = document.getElementById('fv-canvas');
@@ -586,6 +753,7 @@ export const VIEWER_JS = `
   }
   function fitView() {
     var r = canvas.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return;
     var b = bbox();
     var z = Math.min((r.width - 120) / b.w, (r.height - 120) / b.h);
     pz.z = Math.min(4, Math.max(0.02, z));
@@ -653,16 +821,17 @@ export const VIEWER_JS = `
     else if (e.key === '-') zoomCenter(0.8);
     else if (e.key === '0') fitView();
     else if (e.key === '1') document.getElementById('fv-zoom-100').click();
-    else if (e.key === 'Escape') select(null);
+    else if (e.key === 'Escape') { select(null); closePanels(); }
   });
   window.addEventListener('resize', fitView);
 
   // ---------- fix instructions drawer ----------
   var drawer = document.getElementById('fv-drawer');
+  var drawerToggle = document.getElementById('fv-drawer-toggle');
   var insBox = document.getElementById('fv-instructions');
-  var instructions = report.fixInstructions || [];
-  document.getElementById('fv-drawer-toggle').addEventListener('click', function () {
-    drawer.classList.toggle('collapsed');
+  drawerToggle.addEventListener('click', function () {
+    var collapsed = drawer.classList.toggle('collapsed');
+    drawerToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
   });
   var countBadge = document.getElementById('fv-drawer-count');
   countBadge.textContent = instructions.length ? instructions.length + ' step' + (instructions.length > 1 ? 's' : '') : 'none needed';
@@ -685,10 +854,11 @@ export const VIEWER_JS = `
     insBox.innerHTML = oh;
 
     document.getElementById('fv-copy-ins').addEventListener('click', function () {
+      var currentScore = computeScore(profileSel.value);
       var lines = [];
       lines.push('The implementation at ' + (report.liveUrl || 'the live URL') +
-        ' drifts from the Figma design "' + report.frameName + '" (fidelity ' + report.fidelityScore + '/100).');
-      lines.push('Apply the following fixes in order, then re-run verify_implementation until the score is 100:');
+        ' drifts from the Figma design "' + report.frameName + '" (fidelity ' + currentScore + '/100, ' + PROFILES[profileSel.value].label.toLowerCase() + ' profile).');
+      lines.push('Apply the following ' + instructions.length + ' fix' + (instructions.length > 1 ? 'es' : '') + ' in order, then re-run verify_implementation until the score is 100:');
       lines.push('');
       instructions.forEach(function (ins) {
         lines.push(ins.step + '. ' + ins.summary);
@@ -697,7 +867,11 @@ export const VIEWER_JS = `
       });
       var text = lines.join('\\n');
       var btn = this;
-      function done(ok) { btn.textContent = ok ? 'Copied!' : 'Copy failed'; setTimeout(function () { btn.textContent = 'Copy as agent prompt'; }, 1600); }
+      function done(ok) {
+        btn.textContent = ok ? 'Copied!' : 'Copy failed';
+        showToast(ok ? 'Copied agent prompt to clipboard' : 'Copy failed \\u2014 select and copy manually');
+        setTimeout(function () { btn.textContent = 'Copy as agent prompt'; }, 1600);
+      }
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
       } else {
