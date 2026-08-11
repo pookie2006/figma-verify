@@ -58,6 +58,15 @@ export interface NormalizedElement {
 
 export type Severity = "critical" | "high" | "medium" | "low";
 
+/**
+ * Scoring profiles:
+ *  - balanced:   flat weighted deductions (default, comparable run-to-run)
+ *  - strict:     same deductions, but criticals cap the score at 40 and highs at 75
+ *  - perElement: each element scored 0-100 independently, final = mean
+ *  - rootCause:  cascade diffs (caused by a parent's drift) weigh only 25%
+ */
+export type ScoringProfile = "balanced" | "strict" | "perElement" | "rootCause";
+
 export interface PropertyDiff {
   property: string;
   expected: string | number;
@@ -65,6 +74,8 @@ export interface PropertyDiff {
   severity: Severity;
   /** Human-readable delta, e.g. "+6px" or "ΔE 41". */
   delta?: string;
+  /** True when this diff is a side effect of a parent element's drift. */
+  cascade?: boolean;
 }
 
 export interface MatchResult {
@@ -86,6 +97,29 @@ export interface ElementReport {
   selector?: string;
   matchMethod: MatchResult["method"];
   diffs: PropertyDiff[];
+  /** Frame-relative bounds of the design element (for report visualization). */
+  designBounds: Bounds;
+  /** Bounds of the matched DOM element, when matched. */
+  domBounds?: Bounds;
+}
+
+/**
+ * One imperative, agent-executable remediation step derived from the drift
+ * report. Steps are ordered so that root causes come first and cascade
+ * side effects are never turned into instructions.
+ */
+export interface FixInstruction {
+  step: number;
+  kind: "create" | "text" | "style" | "layout" | "geometry";
+  /** CSS selector of the element to change (or of the parent for "create"). */
+  selector?: string;
+  designName: string;
+  /** One-line imperative summary. */
+  summary: string;
+  /** CSS-like detail lines, e.g. "padding: 32px  (currently 24px)". */
+  details: string[];
+  /** Extra context, e.g. how many cascade diffs this fix also resolves. */
+  note?: string;
 }
 
 export interface DriftReport {
@@ -93,11 +127,17 @@ export interface DriftReport {
   liveUrl?: string;
   frameName: string;
   viewportWidth: number;
-  /** 0-100, weighted deductions per issue. */
+  /** 0-100 under the selected scoring profile. */
   fidelityScore: number;
+  /** Which profile produced fidelityScore. */
+  scoringProfile: ScoringProfile;
+  /** Score under every profile, for comparison. */
+  scores: Record<ScoringProfile, number>;
   totals: Record<Severity, number>;
   /** Design elements with no acceptable DOM counterpart. */
   missing: { designId: string; designName: string; role: Role }[];
   elements: ElementReport[];
+  /** Ordered, agent-executable remediation steps (empty when clean). */
+  fixInstructions: FixInstruction[];
   generatedAt: string;
 }

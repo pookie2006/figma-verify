@@ -1,4 +1,6 @@
-import type { DriftReport, Severity } from "../types.js";
+import { SCORING_PROFILES } from "../diff/scoring.js";
+import { renderInstructionsMarkdown } from "./instructions.js";
+import type { DriftReport, ScoringProfile, Severity } from "../types.js";
 
 const SEVERITY_ORDER: Severity[] = ["critical", "high", "medium", "low"];
 const SEVERITY_LABEL: Record<Severity, string> = {
@@ -23,7 +25,18 @@ export function renderMarkdown(report: DriftReport): string {
   lines.push(`**Frame:** ${report.frameName}  `);
   if (report.liveUrl) lines.push(`**Live URL:** ${report.liveUrl}  `);
   lines.push(`**Viewport width:** ${report.viewportWidth}px  `);
-  lines.push(`**Fidelity score:** ${report.fidelityScore}/100`);
+  lines.push(
+    `**Fidelity score:** ${report.fidelityScore}/100 (${SCORING_PROFILES[report.scoringProfile].label} profile)  `
+  );
+  lines.push(
+    `**All profiles:** ` +
+      (Object.keys(report.scores) as ScoringProfile[])
+        .map((p) => {
+          const label = `${SCORING_PROFILES[p].label} ${report.scores[p]}`;
+          return p === report.scoringProfile ? `**${label}**` : label;
+        })
+        .join(" · ")
+  );
   lines.push("");
 
   if (issueCount === 0) {
@@ -60,8 +73,9 @@ export function renderMarkdown(report: DriftReport): string {
         (a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity)
       );
       for (const d of sorted) {
+        const delta = `${d.delta ?? ""}${d.cascade ? " (cascade)" : ""}`.trim();
         lines.push(
-          `| ${SEVERITY_LABEL[d.severity]} | ${d.property} | \`${d.expected}\` | \`${d.actual ?? "—"}\` | ${d.delta ?? ""} |`
+          `| ${SEVERITY_LABEL[d.severity]} | ${d.property} | \`${d.expected}\` | \`${d.actual ?? "—"}\` | ${delta} |`
         );
       }
       lines.push("");
@@ -76,11 +90,13 @@ export function renderMarkdown(report: DriftReport): string {
     lines.push("");
   }
 
-  lines.push(`---`);
+  lines.push(`## Fix instructions (for the implementing agent)`);
+  lines.push("");
   lines.push(
-    `_Fix the criticals first (missing elements, wrong text), then highs (colors, typography), ` +
-      `then mediums (spacing, size). Re-run \`verify_implementation\` after each fix until the score is 100._`
+    `_Apply these steps in order. Steps address root causes; diffs marked (cascade) above are side effects and need no separate action._`
   );
+  lines.push("");
+  lines.push(renderInstructionsMarkdown(report.fixInstructions));
 
   return lines.join("\n");
 }

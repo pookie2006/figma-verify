@@ -1,11 +1,13 @@
 import type { Tolerances } from "../config.js";
-import { SEVERITY_DEDUCTIONS } from "../config.js";
+import { generateFixInstructions } from "../report/instructions.js";
+import { computeScores, DEFAULT_SCORING_PROFILE } from "./scoring.js";
 import type {
   DriftReport,
   ElementReport,
   MatchResult,
   NormalizedElement,
   PropertyDiff,
+  ScoringProfile,
   Severity,
 } from "../types.js";
 
@@ -24,7 +26,13 @@ export function diffMatches(
   dom: NormalizedElement[],
   matches: MatchResult[],
   tolerances: Tolerances,
-  meta: { frameName: string; viewportWidth: number; figmaUrl?: string; liveUrl?: string }
+  meta: {
+    frameName: string;
+    viewportWidth: number;
+    figmaUrl?: string;
+    liveUrl?: string;
+    scoringProfile?: ScoringProfile;
+  }
 ): DriftReport {
   const domById = new Map(dom.map((e) => [e.id, e]));
   const designById = new Map(design.map((e) => [e.id, e]));
@@ -46,6 +54,7 @@ export function diffMatches(
         role: d.role,
         matched: false,
         matchMethod: "unmatched",
+        designBounds: d.bounds,
         diffs: [
           {
             property: "existence",
@@ -69,26 +78,73 @@ export function diffMatches(
       matched: true,
       selector: match.selector ?? w.selector,
       matchMethod: match.method,
+      designBounds: d.bounds,
+      domBounds: w.bounds,
       diffs,
     });
   }
 
-  let score = 100;
-  for (const severity of Object.keys(totals) as Severity[]) {
-    score -= totals[severity] * SEVERITY_DEDUCTIONS[severity];
-  }
+  tagCascades(designById, elements);
+
+  const scores = computeScores(elements);
+  const scoringProfile = meta.scoringProfile ?? DEFAULT_SCORING_PROFILE;
+  const fixInstructions = generateFixInstructions(elements, missing, design);
 
   return {
     figmaUrl: meta.figmaUrl,
     liveUrl: meta.liveUrl,
     frameName: meta.frameName,
     viewportWidth: meta.viewportWidth,
-    fidelityScore: Math.max(0, Math.round(score * 10) / 10),
+    fidelityScore: scores[scoringProfile],
+    scoringProfile,
+    scores,
     totals,
     missing,
     elements,
+    fixInstructions,
     generatedAt: new Date().toISOString(),
   };
+}
+
+/** Parent diffs on these properties shift/resize the parent's children. */
+const CASCADE_TRIGGERS = new Set([
+  "paddingTop",
+  "paddingRight",
+  "paddingBottom",
+  "paddingLeft",
+  "gap",
+  "width",
+  "height",
+]);
+
+/** Child diffs on these properties are explainable by a parent trigger. */
+const CASCADE_EFFECTS = new Set(["x", "y", "width", "height"]);
+
+/**
+ * Mark child position/size diffs as cascades when the child's parent (in the
+ * design tree) itself has a layout-affecting diff. Elements appear in design
+ * DFS order, so parents are processed before their children and cascades
+ * propagate transitively (a shifted button also explains its shifted label).
+ */
+function tagCascades(
+  designById: Map<string, NormalizedElement>,
+  elements: ElementReport[]
+): void {
+  const reportByDesignId = new Map(elements.map((e) => [e.designId, e]));
+
+  for (const el of elements) {
+    const parentId = designById.get(el.designId)?.parentId;
+    if (!parentId) continue;
+    const parent = reportByDesignId.get(parentId);
+    if (!parent) continue;
+
+    const parentHasTrigger = parent.diffs.some((d) => CASCADE_TRIGGERS.has(d.property));
+    if (!parentHasTrigger) continue;
+
+    for (const diff of el.diffs) {
+      if (CASCADE_EFFECTS.has(diff.property)) diff.cascade = true;
+    }
+  }
 }
 
 export function diffPair(

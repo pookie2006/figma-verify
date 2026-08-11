@@ -45,12 +45,20 @@ Figma Verify closes the loop. The agent implements, verifies, reads the drift re
               └────────┬─────────┘
                        ▼
               ┌──────────────────┐
-              │ diff.ts          │  tolerances + severity scoring
+              │ diff.ts          │  tolerances + severity + cascade tagging
               └────────┬─────────┘
                        ▼
               ┌──────────────────┐
-              │ render.ts        │  markdown + JSON drift report,
-              └──────────────────┘  fidelity score 0–100
+              │ scoring.ts       │  4 scoring profiles, fidelity 0–100
+              └────────┬─────────┘
+                       ▼
+         ┌─────────────┴─────────────┐
+         ▼                           ▼
+┌──────────────────┐        ┌──────────────────┐
+│ render.ts        │        │ render-html.ts   │
+│ markdown + JSON  │        │ self-contained   │
+│ drift report     │        │ visual report    │
+└──────────────────┘        └──────────────────┘
 ```
 
 Both sources reduce to the same normalized schema — every element becomes
@@ -75,6 +83,49 @@ The browser viewport width is set to the Figma frame width so coordinates compar
 | low | beyond tolerance but within 2× (noted, not failed) | −0.5 |
 
 Default tolerances: position/size ±2px, spacing/padding/gap ±1px, fontSize ±0.5px, colors compared by RGB distance. All configurable per call.
+
+### Scoring profiles
+
+Every run computes the score under four profiles; **balanced** is the standardized default (comparable run-to-run, which matters for the agent loop), and you pick which one gates pass/fail via `--scoring` (CLI) or `scoring` (MCP):
+
+| Profile | Formula | Use when |
+|---|---|---|
+| `balanced` (default) | 100 − flat weighted deductions | General purpose; agent iteration loop |
+| `strict` | balanced, but any critical caps the score at 40, any high at 75 | CI release gates — missing elements can never average out |
+| `perElement` | each element scored 0–100 on its own diffs (missing = 0); final = mean | Large pages, where one broken element shouldn't tank the score |
+| `rootCause` | balanced, but cascade diffs count at 25% weight | Triage — see how many *distinct* problems there really are |
+
+**Cascades:** when a parent's padding/gap/size drifts, every child shifts with it. Those child position diffs are tagged `cascade` in the report and discounted by the `rootCause` profile — in the demo, one wrong padding value produces 15 derived diffs; balanced scores it 18/100 while rootCause scores 40.5/100, telling you it's really ~5 problems, not 25.
+
+### Visual HTML report
+
+Pass `--html <path>` (CLI) or `html_report_path` (MCP) to also emit a **self-contained interactive HTML report** — a single file with zero external resources that you can open anywhere or attach to a PR:
+
+The viewer is styled after the Figma editor itself — a light three-panel layout with a pannable, zoomable canvas:
+
+- **Canvas**: the design (painted from the normalized Figma spec) and the implementation (real screenshot) as floating frames on a dotted canvas. Scroll to pan, Cmd/Ctrl+scroll to zoom, with Fit/100% controls and numbered severity markers on both frames.
+- **Three compare modes**: side by side, onion-skin overlay (design ghosted over the screenshot with an opacity slider), and swipe (draggable split handle).
+- **Layers panel**: a nested Figma-style layers tree with collapse chevrons, layer icons, severity dots, and marker numbers; hovering highlights the element on both frames.
+- **Inspect panel**: with nothing selected, a score dashboard (circular fidelity gauge with letter grade, severity pills that double as marker filters, a hide-cascade-only toggle, category breakdown bars, and the live four-profile formula switcher with deduction walkthrough). Select any marker or layer for Dev-Mode-style diff rows with click-to-copy expected CSS values, plus a redline "expected" ghost drawn on the implementation frame.
+- **Fix instructions drawer**: collapsible bottom drawer with the ordered agent fix list and the "Copy as agent prompt" button.
+
+```bash
+npm run demo:report   # generates demo/report.html from the fixture demo
+```
+
+### Agent fix instructions
+
+Every report ends with **ordered, imperative fix instructions** designed to be fed straight back to the AI agent that implemented the design — closing the loop when both sides are automated:
+
+1. **create** — missing elements first, with the complete spec (size, position, colors, typography, children) so the agent needs nothing but the instruction
+2. **text** — wrong text content, with the exact expected string
+3. **style** — color/typography fixes as ready-to-apply CSS (`background-color: #4f46e5  (currently #7c3aed)`)
+4. **layout** — padding/gap/radius fixes (equal padding sides collapse to shorthand), each noting how many cascade diffs it also resolves
+5. **geometry** — residual box drift last, flagged "re-verify before hand-tuning" since it usually disappears once the steps above are applied
+
+Cascade diffs never become instructions — fixing the root cause fixes them. Available everywhere: the markdown report (`## Fix instructions`), the JSON (`report.fixInstructions`, structured), the CLI (`--instructions` prints only the list), and the HTML report (panel with a **Copy as agent prompt** button that produces a paste-ready prompt).
+
+Validated end-to-end: applying only the generated instructions to the demo's flawed page takes it from 18/100 to 100/100.
 
 ## Quickstart
 
@@ -110,7 +161,7 @@ Also works in Claude Code (`claude mcp add`) and VS Code — anything that speak
 
 ### MCP tools
 
-- **`verify_implementation({ figma_url, live_url, viewport_width?, tolerances? })`** — full drift report: markdown summary plus JSON with per-element diffs (property, expected, actual, severity, CSS selector hint so the agent can locate the element to fix).
+- **`verify_implementation({ figma_url, live_url, viewport_width?, tolerances?, scoring?, html_report_path? })`** — full drift report: markdown summary plus JSON with per-element diffs (property, expected, actual, severity, CSS selector hint so the agent can locate the element to fix). Optionally writes the visual HTML report.
 - **`get_design_spec({ figma_url })`** — just the normalized design spec, for inspecting the target before/without diffing.
 
 `figma_url` is a "Copy link to selection" URL — it must contain `?node-id=...`.
@@ -122,10 +173,14 @@ Also works in Claude Code (`claude mcp add`) and VS Code — anything that speak
 npm run cli -- "https://www.figma.com/design/KEY/name?node-id=1-2" http://localhost:5173
 
 # Offline, using the recorded fixture (no token needed):
-npm run demo:serve                 # serves demo/ on :4173 (separate terminal)
-npm run cli -- --fixture demo/design-fixture.json http://localhost:4173
+npm run cli -- --fixture demo/design-fixture.json "file://$PWD/demo/index.html"
+
+# With the visual report and a different scoring profile:
+npm run cli -- --fixture demo/design-fixture.json "file://$PWD/demo/index.html" \
+  --html report.html --scoring rootCause
 ```
 
+Options: `--viewport <px>`, `--scoring balanced|strict|perElement|rootCause`, `--html <path>`, `--json`.
 Exit code 0 = fidelity 100, 1 = drift found, 2 = error.
 
 ## Demo

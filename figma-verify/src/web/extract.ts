@@ -1,21 +1,27 @@
 import { chromium } from "playwright";
 import type { NormalizedElement } from "../types.js";
 
+export interface ExtractionResult {
+  elements: NormalizedElement[];
+  /** PNG screenshot of the rendered viewport, base64-encoded. */
+  screenshotBase64: string;
+}
+
 /**
  * Render a live URL in headless Chromium and reduce the visible DOM to
  * NormalizedElement[] (coordinates relative to the document's top-left,
  * which lines up with the Figma frame when viewport width matches the
- * frame width).
+ * frame width). Also captures a viewport screenshot for visual reports.
  */
 export async function extractFromUrl(
   liveUrl: string,
   viewportWidth: number,
   viewportHeight = 1200
-): Promise<NormalizedElement[]> {
+): Promise<ExtractionResult> {
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage({
-      viewport: { width: viewportWidth, height: viewportHeight },
+      viewport: { width: viewportWidth, height: Math.max(200, Math.round(viewportHeight)) },
       deviceScaleFactor: 1,
     });
     await page.goto(liveUrl, { waitUntil: "networkidle", timeout: 30_000 });
@@ -26,7 +32,8 @@ export async function extractFromUrl(
     // extractInPage when it is serialized into the page; provide a no-op shim.
     await page.evaluate("globalThis.__name = (fn) => fn");
     const elements = (await page.evaluate(extractInPage)) as NormalizedElement[];
-    return elements;
+    const screenshot = await page.screenshot({ type: "png" });
+    return { elements, screenshotBase64: screenshot.toString("base64") };
   } finally {
     await browser.close();
   }

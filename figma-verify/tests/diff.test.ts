@@ -106,6 +106,66 @@ describe("diffMatches", () => {
     const report = diffMatches(design, [], matches, tol, { frameName: "F", viewportWidth: 800 });
     expect(report.fidelityScore).toBe(0);
   });
+
+  it("computes all four scoring profiles and honors the selected one", () => {
+    const design = [el({ id: "d1", name: "Badge" })];
+    const matches: MatchResult[] = [{ designId: "d1", method: "unmatched" }];
+    const report = diffMatches(design, [], matches, tol, {
+      frameName: "F",
+      viewportWidth: 800,
+      scoringProfile: "strict",
+    });
+    expect(report.scores.balanced).toBe(85);
+    expect(report.scores.strict).toBe(40);
+    expect(report.scoringProfile).toBe("strict");
+    expect(report.fidelityScore).toBe(40);
+  });
+
+  it("tags child position diffs as cascades when the parent has a layout diff", () => {
+    const parentDesign = el({
+      id: "card",
+      styles: { paddingTop: 32 },
+      childIds: ["label"],
+      bounds: { x: 0, y: 0, w: 200, h: 100 },
+    });
+    const childDesign = el({
+      id: "label",
+      role: "text",
+      text: "hi",
+      parentId: "card",
+      bounds: { x: 32, y: 32, w: 100, h: 20 },
+    });
+    const parentDom = el({ id: "w-card", styles: { paddingTop: 24 }, bounds: { x: 0, y: 0, w: 200, h: 100 } });
+    const childDom = el({ id: "w-label", role: "text", text: "hi", bounds: { x: 24, y: 24, w: 100, h: 20 } });
+
+    const matches: MatchResult[] = [
+      { designId: "card", domId: "w-card", method: "container" },
+      { designId: "label", domId: "w-label", method: "text" },
+    ];
+    const report = diffMatches([parentDesign, childDesign], [parentDom, childDom], matches, tol, {
+      frameName: "F",
+      viewportWidth: 800,
+    });
+
+    const label = report.elements.find((e) => e.designId === "label")!;
+    const xDiff = label.diffs.find((d) => d.property === "x")!;
+    expect(xDiff.cascade).toBe(true);
+
+    const card = report.elements.find((e) => e.designId === "card")!;
+    expect(card.diffs.find((d) => d.property === "paddingTop")!.cascade).toBeUndefined();
+
+    // Root-cause discounts the cascades, so it scores higher than balanced.
+    expect(report.scores.rootCause).toBeGreaterThan(report.scores.balanced);
+  });
+
+  it("exposes design and dom bounds on element reports", () => {
+    const design = [el({ id: "d1", bounds: { x: 1, y: 2, w: 30, h: 40 } })];
+    const dom = [el({ id: "w1", bounds: { x: 1, y: 2, w: 30, h: 40 } })];
+    const matches: MatchResult[] = [{ designId: "d1", domId: "w1", method: "geometry" }];
+    const report = diffMatches(design, dom, matches, tol, { frameName: "F", viewportWidth: 800 });
+    expect(report.elements[0]!.designBounds).toEqual({ x: 1, y: 2, w: 30, h: 40 });
+    expect(report.elements[0]!.domBounds).toEqual({ x: 1, y: 2, w: 30, h: 40 });
+  });
 });
 
 describe("rgbDistance", () => {

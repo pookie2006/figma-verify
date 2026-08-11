@@ -1,0 +1,716 @@
+/**
+ * Inlined viewer logic for the self-contained HTML report.
+ *
+ * Runs entirely client-side with zero dependencies: pan/zoom canvas, three
+ * compare modes (side-by-side / onion-skin overlay / swipe), a layers tree,
+ * a contextual inspect panel, severity filtering, and live score profiles.
+ *
+ * NOTE: this string is embedded in a <script> tag, so it must not contain
+ * backticks or "$" + "{" sequences.
+ */
+export const VIEWER_JS = `
+(function () {
+  var payload = JSON.parse(document.getElementById('fv-data').textContent);
+  var report = payload.report;
+  var design = payload.design;
+  var frame = design[0];
+  var W = frame.bounds.w, H = frame.bounds.h;
+  var GAP = 96;
+
+  var DEDUCTIONS = { critical: 15, high: 5, medium: 2, low: 0.5 };
+  var CASCADE_DISCOUNT = 0.25;
+  var CAPS = { critical: 40, high: 75 };
+  var SEV_HEX = { critical: '#F24822', high: '#FFA629', medium: '#FFCD29', low: '#9747FF', clean: '#14AE5C' };
+  var SEV_INK = { critical: '#D2361E', high: '#B96A00', medium: '#8F6C00', low: '#7B3FE4', clean: '#0E8A4C' };
+  var SEV_LABEL = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' };
+  var CHIP_DARK = { medium: true, high: true };
+  var PROFILES = {
+    balanced: { label: 'Balanced', desc: '100 minus flat weighted deductions (critical -15, high -5, medium -2, low -0.5). Default; comparable run-to-run.' },
+    strict: { label: 'Strict', desc: 'Balanced deductions, but any critical caps the score at 40 and any high at 75. Good as a CI release gate.' },
+    perElement: { label: 'Per-element', desc: 'Each element scored 0-100 on its own diffs (missing = 0); final score is the mean. Robust to page size.' },
+    rootCause: { label: 'Root cause', desc: 'Cascade diffs (caused by a parent\\u2019s drift) count at 25% weight, so one bad padding value reads as one problem.' }
+  };
+  var CATEGORIES = [
+    { name: 'Typography', props: ['text', 'fontFamily', 'fontSize', 'fontWeight', 'lineHeight'] },
+    { name: 'Color & Theming', props: ['backgroundColor', 'textColor', 'borderColor'] },
+    { name: 'Spacing & Layout', props: ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'gap', 'borderRadius', 'borderWidth', 'x', 'y', 'width', 'height'] },
+    { name: 'Components', props: ['existence'] }
+  ];
+
+  // ---------- helpers ----------
+  function round1(v) { return Math.round(v * 10) / 10; }
+  function px(v) { return v + 'px'; }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function ded(diff, discount) {
+    var base = DEDUCTIONS[diff.severity];
+    return discount && diff.cascade ? base * CASCADE_DISCOUNT : base;
+  }
+  function allDiffs() {
+    var out = [];
+    report.elements.forEach(function (el) {
+      el.diffs.forEach(function (d) { out.push({ el: el, diff: d }); });
+    });
+    return out;
+  }
+  function computeScore(profile) {
+    var items = allDiffs();
+    if (profile === 'perElement') {
+      if (report.elements.length === 0) return 100;
+      var sum = 0;
+      report.elements.forEach(function (el) {
+        if (!el.matched) return;
+        var t = 0;
+        el.diffs.forEach(function (d) { t += ded(d, false); });
+        sum += Math.max(0, 100 - t);
+      });
+      return round1(sum / report.elements.length);
+    }
+    var discount = profile === 'rootCause';
+    var total = 0;
+    items.forEach(function (it) { total += ded(it.diff, discount); });
+    var score = Math.max(0, 100 - total);
+    if (profile === 'strict') {
+      Object.keys(CAPS).forEach(function (sev) {
+        if (items.some(function (it) { return it.diff.severity === sev; })) score = Math.min(score, CAPS[sev]);
+      });
+    }
+    return round1(score);
+  }
+  function grade(score) {
+    return score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
+  }
+  function gradeHex(score) {
+    return score >= 80 ? SEV_HEX.clean : score >= 60 ? SEV_HEX.medium : score >= 40 ? SEV_HEX.high : SEV_HEX.critical;
+  }
+  function gradeInk(score) {
+    return score >= 80 ? SEV_INK.clean : score >= 60 ? SEV_INK.medium : score >= 40 ? SEV_INK.high : SEV_INK.critical;
+  }
+  function worstSeverity(el) {
+    if (!el.matched) return 'critical';
+    var order = ['critical', 'high', 'medium', 'low'];
+    for (var i = 0; i < order.length; i++) {
+      if (el.diffs.some(function (d) { return d.severity === order[i]; })) return order[i];
+    }
+    return 'clean';
+  }
+  var reportById = {};
+  report.elements.forEach(function (el) { reportById[el.designId] = el; });
+
+  document.getElementById('fv-meta').textContent =
+    report.frameName + '  \\u00b7  ' + (report.liveUrl || '') + '  \\u00b7  viewport ' + report.viewportWidth + 'px  \\u00b7  ' + report.generatedAt;
+
+  // ---------- frames + stage content ----------
+  var designBlock = document.getElementById('fv-design-block');
+  var implBlock = document.getElementById('fv-impl-block');
+  var designStage = document.getElementById('fv-design-stage');
+  var implStage = document.getElementById('fv-impl-stage');
+  [designStage, implStage].forEach(function (s) { s.style.width = px(W); s.style.height = px(H); });
+  [designBlock, implBlock].forEach(function (b) { b.style.width = px(W); b.style.height = px(H); });
+  document.getElementById('fv-design-label').textContent = frame.name + ' \\u2014 Design';
+  document.getElementById('fv-impl-label').textContent = frame.name + ' \\u2014 Implementation';
+
+  // Paint the design from the normalized spec (parents come before children).
+  designStage.style.background = (frame.styles.backgroundColor || '#ffffff');
+  design.slice(1).forEach(function (el) {
+    var d = document.createElement('div');
+    d.className = 'fv-el';
+    d.style.left = px(el.bounds.x); d.style.top = px(el.bounds.y);
+    d.style.width = px(el.bounds.w); d.style.height = px(el.bounds.h);
+    var st = el.styles || {};
+    if (st.backgroundColor) d.style.background = st.backgroundColor;
+    if (st.borderRadius) d.style.borderRadius = px(st.borderRadius);
+    if (st.borderWidth && st.borderColor) d.style.border = st.borderWidth + 'px solid ' + st.borderColor;
+    if (st.opacity != null) d.style.opacity = String(st.opacity);
+    if (el.role === 'text' && el.text) {
+      d.textContent = el.text;
+      if (st.textColor) d.style.color = st.textColor;
+      if (st.fontFamily) d.style.fontFamily = st.fontFamily;
+      if (st.fontSize) d.style.fontSize = px(st.fontSize);
+      if (st.fontWeight) d.style.fontWeight = String(st.fontWeight);
+      d.style.lineHeight = st.lineHeight ? px(st.lineHeight) : px(el.bounds.h);
+      d.style.whiteSpace = 'nowrap';
+    }
+    designStage.appendChild(d);
+  });
+
+  if (payload.screenshot) {
+    var img = document.createElement('img');
+    img.src = 'data:image/png;base64,' + payload.screenshot;
+    img.width = W;
+    implStage.appendChild(img);
+  } else {
+    implStage.style.background = '#fafafa';
+    var msg = document.createElement('p');
+    msg.className = 'hint';
+    msg.style.padding = '12px';
+    msg.textContent = 'No screenshot captured for this run.';
+    implStage.appendChild(msg);
+  }
+
+  // ---------- markers ----------
+  var markerNo = {};
+  var nextMarker = 1;
+  report.elements.forEach(function (el) {
+    if (!el.matched || el.diffs.length) markerNo[el.designId] = nextMarker++;
+  });
+  var regOv = {};   // designId -> [overlay nodes]
+  var regChip = {}; // designId -> [chip nodes]
+
+  function addOverlay(stage, bounds, el, missing) {
+    var sev = worstSeverity(el);
+    var o = document.createElement('div');
+    o.className = 'fv-ov fv-sev-' + sev + (missing ? ' fv-missing' : '');
+    o.style.left = px(bounds.x); o.style.top = px(bounds.y);
+    o.style.width = px(bounds.w); o.style.height = px(bounds.h);
+    o.dataset.designId = el.designId;
+    o.dataset.name = el.designName + (missing ? ' (missing)' : '');
+    ['tl', 'tr', 'bl', 'br'].forEach(function (c) {
+      var hnd = document.createElement('span');
+      hnd.className = 'h ' + c;
+      o.appendChild(hnd);
+    });
+    o.addEventListener('click', function (e) { e.stopPropagation(); select(el.designId); });
+    o.addEventListener('mouseenter', function () { setHover(el.designId, true); });
+    o.addEventListener('mouseleave', function () { setHover(el.designId, false); });
+    stage.appendChild(o);
+    (regOv[el.designId] = regOv[el.designId] || []).push(o);
+    if (markerNo[el.designId]) {
+      var chip = document.createElement('div');
+      chip.className = 'fv-chip' + (CHIP_DARK[sev] ? ' chip-dark' : '');
+      chip.textContent = String(markerNo[el.designId]);
+      chip.style.left = px(Math.max(0, bounds.x - 4));
+      chip.style.top = px(Math.max(0, bounds.y - 8));
+      chip.style.background = SEV_HEX[sev] || SEV_HEX.clean;
+      chip.title = el.designName;
+      chip.addEventListener('click', function (e) { e.stopPropagation(); select(el.designId); });
+      stage.appendChild(chip);
+      (regChip[el.designId] = regChip[el.designId] || []).push(chip);
+    }
+  }
+  report.elements.forEach(function (el) {
+    addOverlay(designStage, el.designBounds, el, !el.matched);
+    if (el.matched && el.domBounds) addOverlay(implStage, el.domBounds, el, false);
+  });
+
+  function setHover(id, on) {
+    (regOv[id] || []).forEach(function (n) { n.classList.toggle('hovered', on); });
+  }
+
+  // ---------- legend ----------
+  var lg = '<span>Legend</span>';
+  ['critical', 'high', 'medium', 'low'].forEach(function (sev) {
+    lg += '<span class="lg"><span class="sw" style="border-color:' + SEV_HEX[sev] + ';background:' + SEV_HEX[sev] + '22"></span>' + SEV_LABEL[sev] + '</span>';
+  });
+  lg += '<span class="lg"><span class="sw" style="border-color:' + SEV_HEX.critical + ';border-style:dashed;background:transparent"></span>Missing</span>';
+  document.getElementById('fv-legend').innerHTML = lg;
+
+  // ---------- layers tree ----------
+  var kids = {};
+  design.forEach(function (el) {
+    if (el.parentId) (kids[el.parentId] = kids[el.parentId] || []).push(el);
+  });
+  var tree = document.getElementById('fv-tree');
+  var treeRows = {}; // designId -> row node
+
+  function buildTreeRow(el, depth) {
+    var wrap = document.createElement('div');
+    var row = document.createElement('div');
+    row.className = 'tree-row';
+    row.style.paddingLeft = px(4 + depth * 14);
+    var children = kids[el.id] || [];
+
+    var chev = document.createElement('span');
+    chev.className = 'chev';
+    chev.textContent = children.length ? '\\u25be' : '';
+    row.appendChild(chev);
+
+    var ic = document.createElement('span');
+    ic.className = 'layer-ic' + (el.role === 'text' ? '' : ' ic-frame');
+    if (el.role === 'text') ic.textContent = 'T';
+    row.appendChild(ic);
+
+    var rep = reportById[el.id];
+    var name = document.createElement('span');
+    name.className = 'tree-name';
+    name.innerHTML = esc(el.name) + (rep && !rep.matched ? ' <span class="missing-tag">missing</span>' : '');
+    row.appendChild(name);
+
+    if (rep && markerNo[el.id]) {
+      var mk = document.createElement('span');
+      var sev = worstSeverity(rep);
+      mk.className = 'mk' + (CHIP_DARK[sev] ? ' chip-dark' : '');
+      mk.textContent = String(markerNo[el.id]);
+      mk.style.background = SEV_HEX[sev];
+      if (CHIP_DARK[sev]) mk.style.color = '#1E1E1E';
+      row.appendChild(mk);
+    }
+    if (rep) {
+      var dot = document.createElement('span');
+      dot.className = 'dot';
+      dot.style.background = SEV_HEX[worstSeverity(rep)];
+      row.appendChild(dot);
+      row.dataset.designId = el.id;
+      treeRows[el.id] = row;
+      row.addEventListener('click', function () { select(el.id); });
+      row.addEventListener('mouseenter', function () { setHover(el.id, true); });
+      row.addEventListener('mouseleave', function () { setHover(el.id, false); });
+    }
+    wrap.appendChild(row);
+
+    if (children.length) {
+      var kidBox = document.createElement('div');
+      kidBox.className = 'tree-kids';
+      children.forEach(function (c) { kidBox.appendChild(buildTreeRow(c, depth + 1)); });
+      wrap.appendChild(kidBox);
+      chev.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var hidden = kidBox.classList.toggle('hidden');
+        chev.textContent = hidden ? '\\u25b8' : '\\u25be';
+      });
+    }
+    return wrap;
+  }
+  tree.appendChild(buildTreeRow(frame, 0));
+
+  // ---------- selection + inspect panel ----------
+  var selectedId = null;
+  var inspectScore = document.getElementById('fv-inspect-score');
+  var inspectEl = document.getElementById('fv-inspect-el');
+
+  function clearGhost() {
+    var g = document.getElementById('fv-ghost');
+    if (g) g.remove();
+  }
+  function drawGhost(el) {
+    clearGhost();
+    if (!el || !el.matched || !el.domBounds) return;
+    var db = el.designBounds, ib = el.domBounds;
+    var parts = [];
+    if (Math.abs(ib.x - db.x) > 0.5) parts.push('\\u0394x ' + Math.round(ib.x - db.x) + 'px');
+    if (Math.abs(ib.y - db.y) > 0.5) parts.push('\\u0394y ' + Math.round(ib.y - db.y) + 'px');
+    if (Math.abs(ib.w - db.w) > 0.5) parts.push('\\u0394w ' + Math.round(ib.w - db.w) + 'px');
+    if (Math.abs(ib.h - db.h) > 0.5) parts.push('\\u0394h ' + Math.round(ib.h - db.h) + 'px');
+    if (!parts.length) return;
+    var g = document.createElement('div');
+    g.id = 'fv-ghost';
+    g.style.left = px(db.x); g.style.top = px(db.y);
+    g.style.width = px(db.w); g.style.height = px(db.h);
+    var lbl = document.createElement('span');
+    lbl.className = 'ghost-label';
+    lbl.textContent = 'expected \\u00b7 ' + parts.join(' \\u00b7 ');
+    g.appendChild(lbl);
+    implStage.appendChild(g);
+  }
+
+  function select(id) {
+    selectedId = id;
+    Object.keys(regOv).forEach(function (k) {
+      regOv[k].forEach(function (n) { n.classList.toggle('selected', k === id); });
+    });
+    Object.keys(treeRows).forEach(function (k) {
+      treeRows[k].classList.toggle('selected', k === id);
+    });
+    var el = id ? reportById[id] : null;
+    drawGhost(el);
+    if (el) {
+      renderInspect(el);
+      inspectScore.hidden = true;
+      inspectEl.hidden = false;
+      if (treeRows[id]) treeRows[id].scrollIntoView({ block: 'nearest' });
+    } else {
+      inspectScore.hidden = false;
+      inspectEl.hidden = true;
+    }
+  }
+
+  function copyChip(value, label) {
+    return '<code class="copy" data-copy="' + esc(value).replace(/"/g, '&quot;') + '" title="Click to copy">' + esc(label == null ? value : label) + '</code>';
+  }
+
+  function renderInspect(el) {
+    var no = markerNo[el.designId] ? markerNo[el.designId] + '. ' : '';
+    var h = '<button id="fv-back" type="button">\\u2190 Back to score</button>';
+    h += '<div class="insp-title">' + no + esc(el.designName) + '</div>';
+    h += '<div class="insp-meta">' + el.role + ' \\u00b7 matched by ' + el.matchMethod + '</div>';
+    if (el.selector) h += '<div class="insp-selector">' + copyChip(el.selector) + '</div>';
+    if (!el.matched) {
+      h += '<p class="insp-meta" style="color:var(--critical-ink);font-weight:600;">Missing \\u2014 not found in the DOM.</p>';
+      h += '<p class="insp-meta">Expected at x=' + el.designBounds.x + ' y=' + el.designBounds.y + ', ' + el.designBounds.w + '\\u00d7' + el.designBounds.h + 'px. See the fix instructions below for the full build spec.</p>';
+    } else if (!el.diffs.length) {
+      h += '<p class="insp-clean">Clean \\u2014 no drift beyond tolerances.</p>';
+    } else {
+      el.diffs.forEach(function (d) {
+        h += '<div class="insp-row">';
+        h += '<div class="insp-prop"><span class="dot" style="background:' + SEV_HEX[d.severity] + '"></span>' + esc(d.property) +
+          ' <span style="color:' + SEV_INK[d.severity] + ';font-weight:600;font-size:10px;text-transform:uppercase;">' + d.severity + '</span></div>';
+        h += '<div class="insp-vals">' +
+          '<code>' + (d.actual == null ? '\\u2014' : esc(String(d.actual))) + '</code>' +
+          '<span class="arrow">\\u2192</span>' +
+          copyChip(String(d.expected)) +
+          '</div>';
+        if (d.delta || d.cascade) {
+          h += '<div class="insp-delta">' + esc(d.delta || '') + (d.cascade ? ' <span class="cascade-tag">(cascade \\u2014 fix the parent instead)</span>' : '') + '</div>';
+        }
+        h += '</div>';
+      });
+      h += '<p class="insp-delta" style="margin-top:8px;">Click a value chip to copy the expected CSS value.</p>';
+    }
+    var box = document.getElementById('fv-detail');
+    box.innerHTML = h;
+    document.getElementById('fv-back').addEventListener('click', function () { select(null); });
+  }
+
+  document.getElementById('fv-detail').addEventListener('click', function (e) {
+    var chip = e.target.closest('.copy');
+    if (!chip) return;
+    var val = chip.dataset.copy || chip.textContent;
+    function flash() {
+      chip.classList.add('copied');
+      setTimeout(function () { chip.classList.remove('copied'); }, 900);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(val).then(flash, flash);
+    } else { flash(); }
+  });
+
+  // ---------- filters ----------
+  var hiddenSevs = {};
+  var hideCascade = false;
+  function isCascadeOnly(el) {
+    return el.matched && el.diffs.length > 0 && el.diffs.every(function (d) { return d.cascade; });
+  }
+  function applyFilters() {
+    report.elements.forEach(function (el) {
+      var hide = !!hiddenSevs[worstSeverity(el)] || (hideCascade && isCascadeOnly(el));
+      (regOv[el.designId] || []).forEach(function (n) { n.classList.toggle('flt-hidden', hide); });
+      (regChip[el.designId] || []).forEach(function (n) { n.classList.toggle('flt-hidden', hide); });
+    });
+  }
+  document.getElementById('fv-hide-cascade').addEventListener('change', function () {
+    hideCascade = this.checked;
+    applyFilters();
+  });
+
+  // ---------- score panel ----------
+  var profileSel = document.getElementById('fv-profile');
+  Object.keys(PROFILES).forEach(function (p) {
+    var opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = PROFILES[p].label + ' \\u2014 ' + computeScore(p) + '/100';
+    profileSel.appendChild(opt);
+  });
+  profileSel.value = report.scoringProfile || 'balanced';
+  profileSel.addEventListener('change', renderScore);
+
+  var GAUGE_C = 2 * Math.PI * 40;
+  function renderGauge(score) {
+    var arc = document.getElementById('fv-gauge-arc');
+    arc.style.stroke = gradeHex(score);
+    arc.setAttribute('stroke-dasharray', (GAUGE_C * score / 100) + ' ' + GAUGE_C);
+    document.getElementById('fv-score').textContent = String(score);
+    document.getElementById('fv-grade').textContent = grade(score);
+  }
+
+  function renderSummary(profile) {
+    var items = allDiffs();
+    var missing = report.elements.filter(function (el) { return !el.matched; }).length;
+    document.getElementById('fv-score-sub').textContent =
+      items.length + ' difference' + (items.length === 1 ? '' : 's') + ' \\u00b7 ' + missing + ' missing element' + (missing === 1 ? '' : 's');
+
+    var counts = { critical: 0, high: 0, medium: 0, low: 0 };
+    items.forEach(function (it) { counts[it.diff.severity]++; });
+    var pills = document.getElementById('fv-sev-pills');
+    pills.innerHTML = '';
+    var any = false;
+    Object.keys(counts).forEach(function (sev) {
+      if (!counts[sev]) return;
+      any = true;
+      var p = document.createElement('span');
+      p.className = 'sev-count' + (hiddenSevs[sev] ? ' off' : '');
+      p.style.color = SEV_INK[sev];
+      p.style.borderColor = SEV_HEX[sev];
+      p.textContent = counts[sev] + ' ' + SEV_LABEL[sev];
+      p.title = 'Click to show/hide these markers';
+      p.addEventListener('click', function () {
+        hiddenSevs[sev] = !hiddenSevs[sev];
+        p.classList.toggle('off', !!hiddenSevs[sev]);
+        applyFilters();
+      });
+      pills.appendChild(p);
+    });
+    if (!any) {
+      var ok = document.createElement('span');
+      ok.className = 'sev-count';
+      ok.style.color = SEV_INK.clean;
+      ok.style.borderColor = SEV_HEX.clean;
+      ok.textContent = 'No issues';
+      pills.appendChild(ok);
+    }
+
+    var discount = profile === 'rootCause';
+    var ch = '';
+    CATEGORIES.forEach(function (cat) {
+      var catDed = 0, n = 0;
+      items.forEach(function (it) {
+        if (cat.props.indexOf(it.diff.property) === -1) return;
+        catDed += ded(it.diff, discount);
+        n++;
+      });
+      var catScore = Math.max(0, round1(100 - catDed));
+      ch += '<div class="cat-row"><div class="cat-top"><span>' + cat.name +
+        (n ? ' <span style="color:var(--muted)">\\u00b7 ' + n + '</span>' : '') +
+        '</span><span class="cat-val" style="color:' + gradeInk(catScore) + '">' +
+        (catDed ? '\\u2212' + round1(catDed) : '100') + '</span></div>' +
+        '<div class="cat-bar"><span style="width:' + catScore + '%;background:' + gradeHex(catScore) + '"></span></div></div>';
+    });
+    document.getElementById('fv-categories').innerHTML = ch;
+  }
+
+  function renderScore() {
+    var profile = profileSel.value;
+    var score = computeScore(profile);
+    renderGauge(score);
+    renderSummary(profile);
+    document.getElementById('fv-profile-desc').textContent = PROFILES[profile].desc;
+
+    var bd = document.getElementById('fv-breakdown');
+    var h = '';
+    if (profile === 'perElement') {
+      report.elements.forEach(function (el) {
+        var t = 0;
+        el.diffs.forEach(function (d) { t += ded(d, false); });
+        var s = el.matched ? Math.max(0, round1(100 - t)) : 0;
+        h += row(el.designName + (el.matched ? '' : ' (missing)'), s + '/100');
+      });
+      h += row('Mean of ' + report.elements.length + ' elements', score + '/100', true);
+    } else {
+      var discount = profile === 'rootCause';
+      var total = 0;
+      allDiffs().forEach(function (it) {
+        var v = ded(it.diff, discount);
+        total += v;
+        h += row(
+          it.el.designName + ' \\u00b7 ' + it.diff.property + (it.diff.cascade && discount ? ' (cascade \\u00d70.25)' : ''),
+          '\\u2212' + round1(v)
+        );
+      });
+      if (!allDiffs().length) h += '<div class="bd-note">No issues found.</div>';
+      h += row('100 \\u2212 ' + round1(total), String(round1(Math.max(0, 100 - total))), true);
+      if (profile === 'strict') {
+        Object.keys(CAPS).forEach(function (sev) {
+          if (allDiffs().some(function (it) { return it.diff.severity === sev; })) {
+            h += '<div class="bd-note">has ' + sev + ' issues \\u2192 capped at ' + CAPS[sev] + '</div>';
+          }
+        });
+        h += row('Final (after caps)', String(score), true);
+      }
+    }
+    bd.innerHTML = h;
+  }
+  function row(what, val, total) {
+    return '<div class="bd-row' + (total ? ' bd-total' : '') + '"><span class="bd-what">' + esc(what) + '</span><span class="bd-val">' + esc(val) + '</span></div>';
+  }
+  renderScore();
+
+  // ---------- markers on/off ----------
+  var togBtn = document.getElementById('fv-overlay-toggle');
+  togBtn.addEventListener('click', function () {
+    var on = togBtn.getAttribute('aria-pressed') === 'true';
+    togBtn.setAttribute('aria-pressed', on ? 'false' : 'true');
+    togBtn.lastChild.textContent = on ? 'Markers off' : 'Markers on';
+    document.body.classList.toggle('overlays-off', on);
+  });
+
+  // ---------- compare modes ----------
+  var mode = 'side';
+  var swipeP = 0.5;
+  var modeSeg = document.getElementById('fv-mode');
+  var onionGroup = document.getElementById('fv-onion');
+  var onionSlider = document.getElementById('fv-onion-slider');
+  var swipeHandle = document.getElementById('fv-swipe-handle');
+  swipeHandle.style.top = px(-12);
+  swipeHandle.style.height = px(H + 24);
+
+  function updateSwipe() {
+    designBlock.style.clipPath = 'inset(0 ' + ((1 - swipeP) * 100) + '% 0 0)';
+    swipeHandle.style.left = px(swipeP * W - 1);
+  }
+  function applyMode(m) {
+    mode = m;
+    document.body.classList.remove('mode-side', 'mode-overlay', 'mode-swipe');
+    document.body.classList.add('mode-' + m);
+    Array.prototype.forEach.call(modeSeg.querySelectorAll('button'), function (b) {
+      b.classList.toggle('active', b.dataset.mode === m);
+    });
+    implBlock.style.left = m === 'side' ? px(W + GAP) : '0px';
+    designBlock.style.zIndex = m === 'side' ? '1' : '2';
+    designBlock.style.opacity = m === 'overlay' ? String(onionSlider.value / 100) : '1';
+    designBlock.style.clipPath = m === 'swipe' ? 'inset(0 ' + ((1 - swipeP) * 100) + '% 0 0)' : 'none';
+    onionGroup.hidden = m !== 'overlay';
+    swipeHandle.hidden = m !== 'swipe';
+    if (m === 'swipe') updateSwipe();
+    fitView();
+  }
+  modeSeg.addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (b && b.dataset.mode) applyMode(b.dataset.mode);
+  });
+  onionSlider.addEventListener('input', function () {
+    if (mode === 'overlay') designBlock.style.opacity = String(this.value / 100);
+  });
+  swipeHandle.addEventListener('mousedown', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    var startX = e.clientX, startP = swipeP;
+    function move(ev) {
+      swipeP = Math.min(1, Math.max(0, startP + (ev.clientX - startX) / (pz.z * W)));
+      updateSwipe();
+    }
+    function up() {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    }
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  });
+
+  // ---------- pan / zoom ----------
+  var canvas = document.getElementById('fv-canvas');
+  var world = document.getElementById('fv-world');
+  var pz = { x: 0, y: 0, z: 1 };
+  function applyPz() {
+    world.style.transform = 'translate(' + pz.x + 'px,' + pz.y + 'px) scale(' + pz.z + ')';
+    document.getElementById('fv-zoom').textContent = Math.round(pz.z * 100) + '%';
+  }
+  function bbox() {
+    return { w: mode === 'side' ? 2 * W + GAP : W, h: H };
+  }
+  function fitView() {
+    var r = canvas.getBoundingClientRect();
+    var b = bbox();
+    var z = Math.min((r.width - 120) / b.w, (r.height - 120) / b.h);
+    pz.z = Math.min(4, Math.max(0.02, z));
+    pz.x = (r.width - b.w * pz.z) / 2;
+    pz.y = (r.height - b.h * pz.z) / 2 + 8;
+    applyPz();
+  }
+  function zoomAt(cx, cy, factor) {
+    var nz = Math.min(8, Math.max(0.05, pz.z * factor));
+    pz.x = cx - (cx - pz.x) * (nz / pz.z);
+    pz.y = cy - (cy - pz.y) * (nz / pz.z);
+    pz.z = nz;
+    applyPz();
+  }
+  canvas.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var r = canvas.getBoundingClientRect();
+    if (e.ctrlKey || e.metaKey) {
+      zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.01));
+    } else {
+      pz.x -= e.deltaX;
+      pz.y -= e.deltaY;
+      applyPz();
+    }
+  }, { passive: false });
+  canvas.addEventListener('mousedown', function (e) {
+    if (e.target.closest('.fv-ov, .fv-chip, #fv-swipe-handle')) return;
+    e.preventDefault();
+    var sx = e.clientX, sy = e.clientY, ox = pz.x, oy = pz.y, moved = false;
+    canvas.classList.add('panning');
+    function move(ev) {
+      var dx = ev.clientX - sx, dy = ev.clientY - sy;
+      if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+      pz.x = ox + dx; pz.y = oy + dy;
+      applyPz();
+    }
+    function up() {
+      canvas.classList.remove('panning');
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      if (!moved) select(null);
+    }
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  });
+  function zoomCenter(factor) {
+    var r = canvas.getBoundingClientRect();
+    zoomAt(r.width / 2, r.height / 2, factor);
+  }
+  document.getElementById('fv-zoom-in').addEventListener('click', function () { zoomCenter(1.25); });
+  document.getElementById('fv-zoom-out').addEventListener('click', function () { zoomCenter(0.8); });
+  document.getElementById('fv-zoom-fit').addEventListener('click', fitView);
+  document.getElementById('fv-zoom-100').addEventListener('click', function () {
+    var r = canvas.getBoundingClientRect();
+    var b = bbox();
+    pz.z = 1;
+    pz.x = (r.width - b.w) / 2;
+    pz.y = 24;
+    applyPz();
+  });
+  document.addEventListener('keydown', function (e) {
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+    if (e.key === '+' || e.key === '=') zoomCenter(1.25);
+    else if (e.key === '-') zoomCenter(0.8);
+    else if (e.key === '0') fitView();
+    else if (e.key === '1') document.getElementById('fv-zoom-100').click();
+    else if (e.key === 'Escape') select(null);
+  });
+  window.addEventListener('resize', fitView);
+
+  // ---------- fix instructions drawer ----------
+  var drawer = document.getElementById('fv-drawer');
+  var insBox = document.getElementById('fv-instructions');
+  var instructions = report.fixInstructions || [];
+  document.getElementById('fv-drawer-toggle').addEventListener('click', function () {
+    drawer.classList.toggle('collapsed');
+  });
+  var countBadge = document.getElementById('fv-drawer-count');
+  countBadge.textContent = instructions.length ? instructions.length + ' step' + (instructions.length > 1 ? 's' : '') : 'none needed';
+  if (!instructions.length) {
+    insBox.innerHTML = '<p style="color:var(--clean-ink);font-weight:600;">No fixes needed \\u2014 the implementation matches the design within tolerances.</p>';
+    document.getElementById('fv-copy-ins').style.display = 'none';
+  } else {
+    var oh = '<ol>';
+    instructions.forEach(function (ins) {
+      oh += '<li><span class="kind-pill">' + esc(ins.kind) + '</span>' + esc(ins.summary);
+      if (ins.details.length) {
+        oh += '<ul class="ins-details">';
+        ins.details.forEach(function (d) { oh += '<li>' + esc(d) + '</li>'; });
+        oh += '</ul>';
+      }
+      if (ins.note) oh += '<div class="ins-note">' + esc(ins.note) + '</div>';
+      oh += '</li>';
+    });
+    oh += '</ol>';
+    insBox.innerHTML = oh;
+
+    document.getElementById('fv-copy-ins').addEventListener('click', function () {
+      var lines = [];
+      lines.push('The implementation at ' + (report.liveUrl || 'the live URL') +
+        ' drifts from the Figma design "' + report.frameName + '" (fidelity ' + report.fidelityScore + '/100).');
+      lines.push('Apply the following fixes in order, then re-run verify_implementation until the score is 100:');
+      lines.push('');
+      instructions.forEach(function (ins) {
+        lines.push(ins.step + '. ' + ins.summary);
+        ins.details.forEach(function (d) { lines.push('   - ' + d); });
+        if (ins.note) lines.push('   Note: ' + ins.note);
+      });
+      var text = lines.join('\\n');
+      var btn = this;
+      function done(ok) { btn.textContent = ok ? 'Copied!' : 'Copy failed'; setTimeout(function () { btn.textContent = 'Copy as agent prompt'; }, 1600); }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(true); } catch (err) { done(false); }
+        document.body.removeChild(ta);
+      }
+    });
+  }
+
+  // ---------- init ----------
+  applyMode('side');
+  requestAnimationFrame(fitView);
+})();
+`;
