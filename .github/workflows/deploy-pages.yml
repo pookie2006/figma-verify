@@ -48,10 +48,12 @@ jobs:
       - name: Assemble the static site
         run: |
           mkdir -p _site
-          cp site/index.html _site/index.html
+          # Report is the entry point — no intro landing page.
+          cp demo/report.html _site/index.html
           cp demo/report.html _site/report.html
           cp demo/index.html _site/demo-implementation.html
           cp demo/design-reference.html _site/design-reference.html
+          touch _site/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3
         with:

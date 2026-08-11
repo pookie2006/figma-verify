@@ -236,11 +236,12 @@ Every push to `main` that touches `figma-verify/` regenerates the demo report an
 
 A pre-built copy of the demo site is checked into [`docs/`](../docs/) at the repo root. On [Settings → Pages](https://github.com/pookie2006/figma-verify/settings/pages), set Source to **Deploy from a branch**, Branch to `main`, Folder to `/docs`, then Save. The same URL goes live within a minute — no Actions needed.
 
-The published site links to:
+The published site opens straight into the interactive report (`index.html` / `report.html`). Supporting pages:
 
-- `report.html` — the interactive drift report
 - `demo-implementation.html` — the flawed page it's scoring
 - `design-reference.html` — a pixel-faithful reference build
+
+Use the top toolbar to insert a **code folder** and a **Figma mockup** (fixture JSON or image) before comparing.
 
 ## Tests
 

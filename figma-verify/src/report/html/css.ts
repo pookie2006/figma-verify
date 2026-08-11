@@ -35,12 +35,17 @@ button, select, input { font: inherit; color: inherit; }
 }
 
 /* ---- toolbar ---- */
-#fv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; min-height: 50px; padding: 6px 16px; background: var(--chrome); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+#fv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 50px; padding: 6px 16px; background: var(--chrome); border-bottom: 1px solid var(--border); flex-shrink: 0; }
 h1.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; font-family: var(--font-ui); }
 .brand-mark { flex-shrink: 0; color: var(--ink); }
-.brand-frame { font-weight: 500; color: var(--muted); }
-.brand-frame::before { content: '\\2014'; margin: 0 6px; color: var(--border); }
-.meta { flex: 1 1 auto; min-width: 120px; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inserters { display: flex; align-items: stretch; gap: 8px; flex: 1 1 320px; min-width: 0; }
+.inserter { display: flex; align-items: center; gap: 7px; min-width: 0; flex: 1; padding: 5px 10px; border: 1px dashed var(--border); border-radius: 8px; background: var(--chrome-2); cursor: pointer; }
+.inserter:hover, .inserter.has-file { border-style: solid; border-color: var(--accent); background: var(--accent-tint); }
+.inserter-ic { flex-shrink: 0; color: var(--muted); }
+.inserter.has-file .inserter-ic { color: var(--accent-dark); }
+.inserter-kicker { flex-shrink: 0; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.inserter-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--ink); font-weight: 500; }
+.meta { flex: 0 1 180px; min-width: 0; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .meta strong { color: var(--ink); font-family: var(--font-mono); font-weight: 600; }
 .meta .meta-sep { margin: 0 7px; color: var(--border); }
 .agent-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--accent-tint); color: var(--accent-dark); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; }
@@ -67,8 +72,8 @@ h1.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-
 #fv-scrim { display: none; position: fixed; inset: 0; background: rgba(20,20,20,0.28); z-index: 25; }
 #fv-scrim.show { display: block; }
 
-/* ---- layers panel ---- */
-#fv-layers { width: 248px; flex-shrink: 0; background: var(--chrome); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+/* ---- layers panel (right rail) ---- */
+#fv-layers { width: 248px; flex-shrink: 0; background: var(--chrome); border-left: 1px solid var(--border); display: flex; flex-direction: column; order: 3; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px 8px; font-size: 11px; font-weight: 700; color: var(--ink); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
 .panel-close { display: none; border: none; background: none; color: var(--muted); font-size: 16px; cursor: pointer; line-height: 1; padding: 2px 4px; }
 #fv-tree { flex: 1; overflow-y: auto; padding: 4px 4px 12px; }
@@ -87,7 +92,7 @@ h1.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-
 .tree-kids.hidden { display: none; }
 
 /* ---- canvas ---- */
-#fv-canvas { flex: 1; min-width: 0; position: relative; overflow: hidden; background-color: var(--canvas);
+#fv-canvas { flex: 1; min-width: 0; position: relative; overflow: hidden; background-color: var(--canvas); order: 2;
   background-image: radial-gradient(#D7D7D3 1px, transparent 1.5px); background-size: 24px 24px; cursor: grab; }
 #fv-canvas.panning { cursor: grabbing; }
 #fv-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
@@ -136,8 +141,8 @@ body.overlays-off .fv-ov, body.overlays-off .fv-chip, body.overlays-off #fv-ghos
 #fv-mobile-topbar .m-score::after { content: '/100'; font-size: 11px; font-weight: 500; color: var(--muted); }
 #fv-mobile-topbar .m-companion { flex: 1; min-width: 0; font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ---- inspect panel ---- */
-#fv-inspect { width: 288px; flex-shrink: 0; background: var(--chrome); border-left: 1px solid var(--border); overflow-y: auto; }
+/* ---- inspect / score panel (left rail) ---- */
+#fv-inspect { width: 288px; flex-shrink: 0; background: var(--chrome); border-right: 1px solid var(--border); overflow-y: auto; order: 1; }
 #fv-inspect-score, #fv-inspect-el { padding: 16px; }
 .gauge-wrap { position: relative; width: 116px; margin: 4px auto 2px; }
 #fv-gauge { display: block; transform: rotate(-90deg); }
@@ -200,8 +205,12 @@ code, .copy { font-family: var(--font-mono); font-size: 11px; background: var(--
 .insp-clean { color: var(--clean-ink); font-weight: 700; }
 .hint { color: var(--muted); font-style: italic; }
 
-/* ---- fix instructions drawer ---- */
-#fv-drawer { flex-shrink: 0; border-top: 1px solid var(--border); background: var(--chrome); }
+/* ---- fix instructions drawer (resizable) ---- */
+#fv-drawer { flex-shrink: 0; border-top: 1px solid var(--border); background: var(--chrome); position: relative; }
+#fv-drawer-resize { height: 6px; margin-top: -3px; cursor: ns-resize; touch-action: none; position: relative; z-index: 2; }
+#fv-drawer-resize::before { content: ''; position: absolute; left: 50%; top: 1px; transform: translateX(-50%); width: 36px; height: 3px; border-radius: 999px; background: var(--chrome-3); }
+#fv-drawer-resize:hover::before, #fv-drawer-resize:focus-visible::before { background: var(--accent); }
+#fv-drawer.collapsed #fv-drawer-resize { display: none; }
 .drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; }
 #fv-drawer-toggle { display: flex; align-items: center; gap: 8px; border: none; background: none; font-size: 12.5px; font-weight: 700; cursor: pointer; padding: 0; }
 #fv-drawer-toggle .chev { color: var(--muted); font-size: 10px; transition: transform 0.15s; }
@@ -209,8 +218,10 @@ code, .copy { font-family: var(--font-mono); font-size: 11px; background: var(--
 #fv-drawer-toggle .count-badge { background: var(--chrome-2); border: 1px solid var(--border); border-radius: 999px; padding: 0 8px; font-size: 10.5px; font-family: var(--font-mono); color: var(--muted); }
 #fv-copy-ins { font-size: 12px; font-weight: 700; padding: 6px 14px; border: none; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
 #fv-copy-ins:hover { background: var(--accent-dark); }
-#fv-drawer-body { max-height: 32vh; overflow-y: auto; padding: 0 16px 14px; }
+#fv-drawer-body { height: var(--drawer-h, 28vh); max-height: 70vh; min-height: 80px; overflow-y: auto; padding: 0 16px 14px; }
 #fv-drawer.collapsed #fv-drawer-body { display: none; }
+body.drawer-resizing { cursor: ns-resize; user-select: none; }
+body.drawer-resizing #fv-canvas { pointer-events: none; }
 #fv-instructions ol { margin: 0; padding-left: 22px; }
 #fv-instructions li { margin-bottom: 10px; }
 #fv-instructions .ins-details { margin: 4px 0 0; padding-left: 16px; }
@@ -232,18 +243,20 @@ code, .copy { font-family: var(--font-mono); font-size: 11px; background: var(--
    Responsive: ≥1200px is the full 3-pane workspace (default).
    ========================================================= */
 
-/* 800–1199px: canvas is primary; layers/inspect become overlay drawers. */
+/* 800–1199px: canvas is primary; score/layers become overlay drawers. */
 @media (max-width: 1199.98px) {
   #fv-layers, #fv-inspect {
     position: fixed; top: 50px; bottom: 0; width: min(84vw, 300px);
     z-index: 30; box-shadow: 0 8px 28px rgba(0,0,0,0.18);
     transition: transform 0.2s ease;
   }
-  #fv-layers { left: 0; transform: translateX(-100%); }
-  #fv-inspect { right: 0; transform: translateX(100%); }
+  /* Score opens from the left; layers from the right — matching desktop rails. */
+  #fv-inspect { left: 0; right: auto; border-right: 1px solid var(--border); border-left: none; transform: translateX(-100%); }
+  #fv-layers { right: 0; left: auto; border-left: 1px solid var(--border); border-right: none; transform: translateX(100%); }
   #fv-layers.open, #fv-inspect.open { transform: translateX(0); }
   .panel-toggle-btn { display: inline-flex; }
   .panel-close { display: inline-flex; }
+  .inserters { flex: 1 1 100%; order: 5; }
 }
 @media (min-width: 1200px) {
   .panel-toggle-btn, .panel-close { display: none !important; }
@@ -254,8 +267,9 @@ code, .copy { font-family: var(--font-mono); font-size: 11px; background: var(--
 @media (max-width: 799.98px) {
   #fv-toolbar { padding: 6px 10px; gap: 8px; }
   #fv-toolbar .meta { display: none; }
+  .inserter-kicker { display: none; }
   #fv-mobile-topbar { display: flex; }
-  #fv-layers, #fv-inspect { top: 88px; }
+  #fv-layers, #fv-inspect { top: 120px; }
   #fv-drawer { position: fixed; left: 0; right: 0; bottom: 44px; z-index: 20; box-shadow: 0 -6px 20px rgba(0,0,0,0.10); }
   #fv-tabbar { display: flex; }
   body.mobile-fixes #fv-canvas, body.mobile-fixes #fv-legend { display: none; }
