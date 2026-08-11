@@ -218,13 +218,29 @@ Run the CLI as above and watch the report catch all five. Point an agent at the 
 
 ## Deployment
 
-Every push to `main` that touches `figma-verify/` regenerates the demo report and publishes it to GitHub Pages via [`.github/workflows/deploy-pages.yml`](../.github/workflows/deploy-pages.yml) — no external hosting account or API token needed, since it uses GitHub's own `actions/deploy-pages`. The published site (`figma-verify/site/index.html` is the landing page) links to:
+**Live demo:** [pookie2006.github.io/figma-verify](https://pookie2006.github.io/figma-verify/)
+
+There are two ways the site gets published (pick either):
+
+### Option A — GitHub Actions (preferred)
+
+Every push to `main` that touches `figma-verify/` regenerates the demo report and publishes it via [`.github/workflows/deploy-pages.yml`](../.github/workflows/deploy-pages.yml).
+
+**One-time enable (required — the first Actions deploy will 404 until this is done):**
+
+1. Open [Settings → Pages](https://github.com/pookie2006/figma-verify/settings/pages)
+2. Under **Build and deployment → Source**, choose **GitHub Actions**
+3. Re-run the failed workflow: [Actions → Deploy demo to GitHub Pages](https://github.com/pookie2006/figma-verify/actions/workflows/deploy-pages.yml) → *Re-run jobs*
+
+### Option B — Deploy from the committed `docs/` folder
+
+A pre-built copy of the demo site is checked into [`docs/`](../docs/) at the repo root. On [Settings → Pages](https://github.com/pookie2006/figma-verify/settings/pages), set Source to **Deploy from a branch**, Branch to `main`, Folder to `/docs`, then Save. The same URL goes live within a minute — no Actions needed.
+
+The published site links to:
 
 - `report.html` — the interactive drift report
 - `demo-implementation.html` — the flawed page it's scoring
 - `design-reference.html` — a pixel-faithful reference build
-
-If the very first run fails with a "Pages is not enabled" error, flip one switch: repo **Settings → Pages → Build and deployment → Source: "GitHub Actions"**. You can also trigger a deploy manually from the **Actions** tab (`Deploy demo to GitHub Pages` → *Run workflow*) without waiting for a push to `main`.
 
 ## Tests
 
