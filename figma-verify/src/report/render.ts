@@ -37,6 +37,11 @@ export function renderMarkdown(report: DriftReport): string {
         })
         .join(" · ")
   );
+  if (report.similarity.floor > 0) {
+    lines.push(
+      `_Score floor: ${report.similarity.floor}/100 from shared colors/fonts/text with the design, even where elements didn't structurally match._  `
+    );
+  }
   lines.push("");
 
   if (issueCount === 0) {

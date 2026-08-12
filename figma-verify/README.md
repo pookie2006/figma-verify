@@ -241,7 +241,26 @@ The published site opens straight into the interactive report (`index.html` / `r
 - `demo-implementation.html` — the flawed page it's scoring
 - `design-reference.html` — a pixel-faithful reference build
 
-Use the top toolbar to insert a **code folder** and a **Figma mockup** (fixture JSON or image) before comparing.
+### Live compare from the report UI
+
+The GitHub Pages demo is static (it can’t run Playwright). For a real upload-driven compare:
+
+```bash
+cd figma-verify
+npm run studio          # http://127.0.0.1:4174
+```
+
+1. **Code folder** — either:
+   - Click **Link** and paste a **running dev server URL** (e.g. `http://localhost:3000/search-page`) — no upload at all, Playwright just navigates there directly. This is the simplest option if your app is already running (`npm start`), and sidesteps upload-size/permission issues entirely, or
+   - Click **File** and select the folder that contains your **built/static** implementation (`index.html` plus CSS/JS assets — e.g. a React/Vite app's `build/` or `dist/` output after `npm run build`, not the raw `src/`). `node_modules`, `.git`, and similar are excluded automatically; uploads are capped at 80MB / 4000 files so a whole project can't crash the studio server.
+2. **Figma mockup** — either:
+   - Click **Link** and paste a Figma URL — `design`, `file`, `proto`, or `board`, e.g. `https://www.figma.com/proto/KEY/name?node-id=1601-3`. Needs `FIGMA_TOKEN` set before starting the studio (`export FIGMA_TOKEN=...`, from [figma.com/settings](https://www.figma.com/settings) → Personal access tokens), or
+   - Click **File** and upload a **nodes-API fixture JSON** (same shape as `demo/design-fixture.json`) — works offline, no token needed.
+
+   Images are preview-only and cannot drive the structural score.
+3. Click **Compare** — the studio serves the folder, fetches/normalizes the design (from the link or fixture), extracts the live DOM, diffs the two, and reloads the report with the new score / fix instructions.
+
+CLI/MCP remain the headless path (`--fixture` + live URL, or a Figma URL + `FIGMA_TOKEN`).
 
 ## Tests
 

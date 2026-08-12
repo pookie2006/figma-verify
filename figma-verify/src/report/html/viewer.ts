@@ -23,6 +23,7 @@ export const VIEWER_JS = `
   var DEDUCTIONS = { critical: 15, high: 5, medium: 2, low: 0.5 };
   var CASCADE_DISCOUNT = 0.25;
   var CAPS = { critical: 40, high: 75 };
+  var SIMILARITY_FLOOR = (report.similarity && report.similarity.floor) || 0;
   var SEV_HEX = { critical: '#F0472A', high: '#E8890C', medium: '#C99A02', low: '#8B5CF6', clean: '#12966B' };
   var SEV_INK = { critical: '#C3341C', high: '#A8620A', medium: '#8A6C00', low: '#6D3FD6', clean: '#0B7A56' };
   var SEV_LABEL = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' };
@@ -66,7 +67,7 @@ export const VIEWER_JS = `
         el.diffs.forEach(function (d) { t += ded(d, false); });
         sum += Math.max(0, 100 - t);
       });
-      return round1(sum / report.elements.length);
+      return Math.max(round1(sum / report.elements.length), SIMILARITY_FLOOR);
     }
     var discount = profile === 'rootCause';
     var total = 0;
@@ -77,7 +78,7 @@ export const VIEWER_JS = `
         if (items.some(function (it) { return it.diff.severity === sev; })) score = Math.min(score, CAPS[sev]);
       });
     }
-    return round1(score);
+    return Math.max(round1(score), SIMILARITY_FLOOR);
   }
   function grade(score) {
     return score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
@@ -128,55 +129,6 @@ export const VIEWER_JS = `
       (report.liveUrl || 'no live URL') + '  \\u00b7  viewport ' + report.viewportWidth + 'px  \\u00b7  generated ' + report.generatedAt;
   }
 
-  // ---------- source inserters (code folder + Figma mockup) ----------
-  var codeInput = document.getElementById('fv-code-input');
-  var figmaInput = document.getElementById('fv-figma-input');
-  var codeValue = document.getElementById('fv-code-value');
-  var figmaValue = document.getElementById('fv-figma-value');
-  var codeInserter = document.getElementById('fv-code-inserter');
-  var figmaInserter = document.getElementById('fv-figma-inserter');
-
-  codeInput.addEventListener('change', function () {
-    var files = Array.prototype.slice.call(codeInput.files || []);
-    if (!files.length) return;
-    var root = '';
-    var firstPath = files[0].webkitRelativePath || files[0].name;
-    if (firstPath.indexOf('/') !== -1) root = firstPath.split('/')[0];
-    else root = files[0].name;
-    sources.code = root + ' (' + files.length + ' file' + (files.length === 1 ? '' : 's') + ')';
-    codeValue.textContent = sources.code;
-    codeInserter.classList.add('has-file');
-    showToast('Loaded code folder \\u2014 ' + sources.code);
-    updateMeta(activeScore);
-  });
-
-  figmaInput.addEventListener('change', function () {
-    var file = (figmaInput.files || [])[0];
-    if (!file) return;
-    sources.figma = file.name;
-    figmaValue.textContent = file.name;
-    figmaInserter.classList.add('has-file');
-    // If the mockup is an image, optionally preview it as a ghost on the design stage.
-    if (file.type && file.type.indexOf('image/') === 0) {
-      var reader = new FileReader();
-      reader.onload = function () {
-        var old = document.getElementById('fv-mockup-preview');
-        if (old) old.remove();
-        var img = document.createElement('img');
-        img.id = 'fv-mockup-preview';
-        img.alt = 'Uploaded Figma mockup preview';
-        img.src = String(reader.result);
-        img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0.35;pointer-events:none;z-index:1;';
-        designStage.appendChild(img);
-        showToast('Loaded Figma mockup \\u2014 ' + file.name);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      showToast('Loaded Figma mockup \\u2014 ' + file.name);
-    }
-    updateMeta(activeScore);
-  });
-
   // ---------- frames + stage content ----------
   var designBlock = document.getElementById('fv-design-block');
   var implBlock = document.getElementById('fv-impl-block');
@@ -186,6 +138,348 @@ export const VIEWER_JS = `
   [designBlock, implBlock].forEach(function (b) { b.style.width = px(W); b.style.height = px(H); });
   document.getElementById('fv-design-label').textContent = frame.name + ' \\u2014 Design';
   document.getElementById('fv-impl-label').textContent = frame.name + ' \\u2014 Implementation';
+
+  // ---------- source inserters (code folder + Figma mockup) ----------
+  // Real compares require the local studio server (npm run studio). Images are
+  // preview-only; fixture JSON + a code folder drive Playwright verification.
+  var codeInput = document.getElementById('fv-code-input');
+  var codeFileTrigger = document.getElementById('fv-code-file-trigger');
+  var codeUrlInput = document.getElementById('fv-code-url');
+  var codeModeToggle = document.getElementById('fv-code-mode-toggle');
+  var figmaInput = document.getElementById('fv-figma-input');
+  var figmaFileTrigger = document.getElementById('fv-figma-file-trigger');
+  var figmaUrlInput = document.getElementById('fv-figma-url');
+  var figmaModeToggle = document.getElementById('fv-figma-mode-toggle');
+  var codeValue = document.getElementById('fv-code-value');
+  var figmaValue = document.getElementById('fv-figma-value');
+  var codeInserter = document.getElementById('fv-code-inserter');
+  var figmaInserter = document.getElementById('fv-figma-inserter');
+  var compareBtn = document.getElementById('fv-compare');
+  var pendingCodeFiles = [];
+  var pendingLiveUrl = '';
+  var pendingFixtureFile = null;
+  var pendingFigmaUrl = '';
+  var pendingPreviewOnly = false;
+  var studioReady = null;
+  var FIGMA_URL_RE = /^https?:\\/\\/([a-z0-9-]+\\.)*figma\\.com\\//i;
+  var LIVE_URL_RE = /^(https?|file):\\/\\//i;
+  var EXCLUDED_SEGMENT_RE = /^(node_modules|\\.git|\\.hg|\\.svn|\\.next|\\.turbo|\\.cache|\\.parcel-cache|coverage|\\.nyc_output)$/i;
+  var MAX_UPLOAD_BYTES = 80 * 1024 * 1024;
+  var MAX_UPLOAD_FILES = 4000;
+
+  function hasCodeSource() {
+    return !!pendingLiveUrl || pendingCodeFiles.length > 0;
+  }
+
+  function isExcludedPath(relPath) {
+    var segs = relPath.replace(/\\\\/g, '/').split('/');
+    for (var i = 0; i < segs.length; i++) { if (EXCLUDED_SEGMENT_RE.test(segs[i])) return true; }
+    var base = segs[segs.length - 1];
+    return base === '.DS_Store' || base === 'Thumbs.db';
+  }
+
+  function humanSize(bytes) {
+    if (bytes > 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + 'MB';
+    if (bytes > 1024) return (bytes / 1024).toFixed(0) + 'KB';
+    return bytes + 'B';
+  }
+
+  function hasDesignSource() {
+    return (pendingFigmaUrl && !pendingPreviewOnly) || (pendingFixtureFile && !pendingPreviewOnly);
+  }
+
+  function syncCompareBtn() {
+    var ready = hasCodeSource() && hasDesignSource();
+    compareBtn.disabled = !ready || compareBtn.classList.contains('busy');
+    compareBtn.title = pendingPreviewOnly
+      ? 'Images are preview-only — paste a Figma link or upload a fixture JSON to compare'
+      : !ready
+        ? 'Choose a code folder (or paste a live URL) and a Figma link or fixture JSON, then Compare'
+        : 'Run a real compare via the local studio server';
+  }
+
+  // ---------- Code inserter: toggle between folder upload and paste-a-live-URL ----------
+  function setCodeMode(mode) {
+    var isUrl = mode === 'url';
+    codeModeToggle.setAttribute('aria-pressed', isUrl ? 'true' : 'false');
+    codeModeToggle.textContent = isUrl ? 'File' : 'Link';
+    codeModeToggle.title = isUrl ? 'Upload a folder instead' : 'Paste a live URL instead of uploading a folder';
+    codeFileTrigger.hidden = isUrl;
+    codeUrlInput.hidden = !isUrl;
+    if (isUrl) {
+      pendingCodeFiles = [];
+      codeValue.textContent = 'Choose folder\\u2026';
+      codeInserter.classList.remove('has-file');
+      codeUrlInput.focus();
+    } else {
+      pendingLiveUrl = '';
+      codeUrlInput.value = '';
+      codeInserter.classList.remove('has-file');
+    }
+    updateMeta(activeScore);
+    syncCompareBtn();
+  }
+
+  codeModeToggle.addEventListener('click', function () {
+    var isUrl = codeModeToggle.getAttribute('aria-pressed') === 'true';
+    setCodeMode(isUrl ? 'file' : 'url');
+  });
+
+  function commitCodeUrl() {
+    var raw = codeUrlInput.value.trim();
+    if (!raw) {
+      pendingLiveUrl = '';
+      sources.code = null;
+      codeInserter.classList.remove('has-file');
+      syncCompareBtn();
+      return;
+    }
+    if (!LIVE_URL_RE.test(raw)) {
+      showToast('Use an http://, https://, or file:// URL');
+      return;
+    }
+    pendingLiveUrl = raw;
+    sources.code = raw;
+    codeInserter.classList.add('has-file');
+    updateMeta(activeScore);
+    showToast('Live URL set \\u2014 ready to compare');
+    syncCompareBtn();
+  }
+
+  codeUrlInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); commitCodeUrl(); }
+  });
+  codeUrlInput.addEventListener('blur', commitCodeUrl);
+
+  // ---------- Figma inserter: toggle between file upload and paste-a-link ----------
+  function setFigmaMode(mode) {
+    var isUrl = mode === 'url';
+    figmaModeToggle.setAttribute('aria-pressed', isUrl ? 'true' : 'false');
+    figmaModeToggle.textContent = isUrl ? 'File' : 'Link';
+    figmaModeToggle.title = isUrl ? 'Upload a fixture file instead' : 'Paste a Figma link instead of a file';
+    figmaFileTrigger.hidden = isUrl;
+    figmaUrlInput.hidden = !isUrl;
+    if (isUrl) {
+      pendingFixtureFile = null;
+      figmaValue.textContent = 'Choose file\\u2026';
+      figmaInserter.classList.remove('has-file');
+      var oldPrev = document.getElementById('fv-mockup-preview');
+      if (oldPrev) oldPrev.remove();
+      pendingPreviewOnly = false;
+      figmaUrlInput.focus();
+    } else {
+      pendingFigmaUrl = '';
+      sources.figma = null;
+      figmaUrlInput.value = '';
+      figmaInserter.classList.remove('has-file');
+    }
+    updateMeta(activeScore);
+    syncCompareBtn();
+  }
+
+  figmaModeToggle.addEventListener('click', function () {
+    var isUrl = figmaModeToggle.getAttribute('aria-pressed') === 'true';
+    setFigmaMode(isUrl ? 'file' : 'url');
+  });
+
+  function commitFigmaUrl() {
+    var raw = figmaUrlInput.value.trim();
+    if (!raw) {
+      pendingFigmaUrl = '';
+      sources.figma = null;
+      figmaInserter.classList.remove('has-file');
+      syncCompareBtn();
+      return;
+    }
+    if (!FIGMA_URL_RE.test(raw)) {
+      showToast('That doesn\\u2019t look like a figma.com link');
+      return;
+    }
+    pendingFigmaUrl = raw;
+    sources.figma = raw;
+    figmaInserter.classList.add('has-file');
+    updateMeta(activeScore);
+    showToast('Figma link set \\u2014 ready to compare');
+    syncCompareBtn();
+  }
+
+  figmaUrlInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); commitFigmaUrl(); }
+  });
+  figmaUrlInput.addEventListener('blur', commitFigmaUrl);
+
+  function probeStudio() {
+    if (studioReady !== null) return Promise.resolve(studioReady);
+    return fetch('/api/health', { method: 'GET' })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function (j) {
+        studioReady = !!(j && j.studio);
+        return studioReady;
+      })
+      .catch(function () {
+        studioReady = false;
+        return false;
+      });
+  }
+
+  codeInput.addEventListener('change', function () {
+    var rawFiles = Array.prototype.slice.call(codeInput.files || []);
+    if (!rawFiles.length) return;
+    var root = '';
+    var firstPath = rawFiles[0].webkitRelativePath || rawFiles[0].name;
+    if (firstPath.indexOf('/') !== -1) root = firstPath.split('/')[0];
+    else root = rawFiles[0].name;
+
+    var kept = [];
+    var skippedCount = 0;
+    var skippedBytes = 0;
+    var keptBytes = 0;
+    for (var i = 0; i < rawFiles.length; i++) {
+      var f = rawFiles[i];
+      var rel = f.webkitRelativePath || f.name;
+      if (isExcludedPath(rel)) {
+        skippedCount++;
+        skippedBytes += f.size;
+      } else {
+        kept.push(f);
+        keptBytes += f.size;
+      }
+    }
+
+    if (!kept.length) {
+      pendingCodeFiles = [];
+      codeValue.textContent = 'No usable files (all excluded)';
+      codeInserter.classList.remove('has-file');
+      showToast('Everything in that folder was excluded (node_modules/.git/etc.) \\u2014 pick a build output folder');
+      updateMeta(activeScore);
+      syncCompareBtn();
+      return;
+    }
+
+    var limitMsg = kept.length > MAX_UPLOAD_FILES
+      ? 'Too many files (' + kept.length + ', limit ' + MAX_UPLOAD_FILES + ') \\u2014 upload your built/static output (npm run build), not raw source'
+      : keptBytes > MAX_UPLOAD_BYTES
+        ? 'Folder is ' + humanSize(keptBytes) + ' (limit ' + humanSize(MAX_UPLOAD_BYTES) + ') \\u2014 upload your built/static output instead'
+        : null;
+
+    if (limitMsg) {
+      pendingCodeFiles = [];
+      codeValue.textContent = 'Too large \\u2014 see toast';
+      codeInserter.classList.remove('has-file');
+      showToast(limitMsg);
+      updateMeta(activeScore);
+      syncCompareBtn();
+      return;
+    }
+
+    pendingCodeFiles = kept;
+    sources.code = root + ' (' + kept.length + ' file' + (kept.length === 1 ? '' : 's') + ', ' + humanSize(keptBytes) + ')';
+    codeValue.textContent = sources.code;
+    codeInserter.classList.add('has-file');
+    showToast(
+      skippedCount
+        ? 'Loaded ' + root + ' \\u2014 skipped ' + skippedCount + ' file' + (skippedCount === 1 ? '' : 's') + ' (node_modules/.git/etc., ' + humanSize(skippedBytes) + ')'
+        : 'Loaded code folder \\u2014 ' + sources.code
+    );
+    updateMeta(activeScore);
+    syncCompareBtn();
+  });
+
+  figmaInput.addEventListener('change', function () {
+    var file = (figmaInput.files || [])[0];
+    if (!file) return;
+    sources.figma = file.name;
+    figmaValue.textContent = file.name;
+    figmaInserter.classList.add('has-file');
+    var old = document.getElementById('fv-mockup-preview');
+    if (old) old.remove();
+    pendingPreviewOnly = (file.type && file.type.indexOf('image/') === 0) ||
+      /\\.(png|jpe?g|webp|svg)$/i.test(file.name);
+    pendingFixtureFile = pendingPreviewOnly ? null : file;
+    if (pendingPreviewOnly) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        var img = document.createElement('img');
+        img.id = 'fv-mockup-preview';
+        img.alt = 'Uploaded Figma mockup preview';
+        img.src = String(reader.result);
+        img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0.35;pointer-events:none;z-index:1;';
+        designStage.appendChild(img);
+        showToast('Preview only \\u2014 upload fixture JSON to compare');
+      };
+      reader.readAsDataURL(file);
+    } else {
+      showToast('Loaded fixture \\u2014 ' + file.name + ' (ready to compare)');
+    }
+    updateMeta(activeScore);
+    syncCompareBtn();
+  });
+
+  compareBtn.addEventListener('click', function () {
+    if (compareBtn.disabled) return;
+    if (codeUrlInput && !codeUrlInput.hidden) commitCodeUrl();
+    if (figmaUrlInput && !figmaUrlInput.hidden) commitFigmaUrl();
+    if (!hasCodeSource() || !hasDesignSource()) {
+      showToast('Choose a code folder (or paste a live URL) and a Figma link or fixture JSON first');
+      return;
+    }
+    compareBtn.classList.add('busy');
+    compareBtn.disabled = true;
+    compareBtn.textContent = 'Comparing\\u2026';
+    probeStudio().then(function (ok) {
+      if (!ok) {
+        showToast('Start the studio: npm run studio (then open localhost:4174)');
+        compareBtn.classList.remove('busy');
+        compareBtn.textContent = 'Compare';
+        syncCompareBtn();
+        return;
+      }
+      var fd = new FormData();
+      if (pendingFigmaUrl) {
+        fd.append('figmaUrl', pendingFigmaUrl);
+      } else {
+        fd.append('fixture', pendingFixtureFile, pendingFixtureFile.name);
+      }
+      if (pendingLiveUrl) {
+        fd.append('liveUrl', pendingLiveUrl);
+      } else {
+        pendingCodeFiles.forEach(function (f) {
+          var rel = f.webkitRelativePath || f.name;
+          fd.append('files', f, rel);
+        });
+      }
+      var profileEl = document.getElementById('fv-profile');
+      if (profileEl && profileEl.value) fd.append('scoring', profileEl.value);
+      return fetch('/api/verify', { method: 'POST', body: fd })
+        .catch(function () {
+          // fetch() itself rejected: the connection died mid-request, most often
+          // because the studio server crashed or was restarted (e.g. an upload
+          // too large) or was never running in the first place.
+          throw new Error(
+            'Lost the connection to the studio server. If it crashed mid-upload, restart it (npm run studio) ' +
+            'and make sure the code folder is a built/static output, not raw source with node_modules.'
+          );
+        })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+        .then(function (res) {
+          if (!res.ok || !res.body || !res.body.html) {
+            throw new Error((res.body && res.body.error) || 'Compare failed');
+          }
+          showToast('Compare complete \\u2014 reloading report');
+          document.open();
+          document.write(res.body.html);
+          document.close();
+        })
+        .catch(function (err) {
+          showToast(err.message || 'Compare failed');
+          compareBtn.classList.remove('busy');
+          compareBtn.textContent = 'Compare';
+          syncCompareBtn();
+        });
+    });
+  });
+  syncCompareBtn();
+  probeStudio();
 
   // Paint the design from the normalized spec (parents come before children).
   designStage.style.background = (frame.styles.backgroundColor || '#ffffff');
@@ -641,6 +935,7 @@ export const VIEWER_JS = `
         h += row(el.designName + (el.matched ? '' : ' (missing)'), s + '/100');
       });
       h += row('Mean of ' + report.elements.length + ' elements', score + '/100', true);
+      h += similarityFloorNote(score);
     } else {
       var result = renderWalkthroughRootFirst(profile);
       h += result.html;
@@ -654,11 +949,22 @@ export const VIEWER_JS = `
         });
         h += row('Final (after caps)', String(score), true);
       }
+      h += similarityFloorNote(score);
     }
     bd.innerHTML = h;
   }
   function row(what, val, total) {
     return '<div class="bd-row' + (total ? ' bd-total' : '') + '"><span class="bd-what">' + esc(what) + '</span><span class="bd-val">' + esc(val) + '</span></div>';
+  }
+  function similarityFloorNote(score) {
+    if (!SIMILARITY_FLOOR || score !== SIMILARITY_FLOOR) return '';
+    var sim = report.similarity || {};
+    var parts = [];
+    if (sim.colorOverlap !== null && sim.colorOverlap !== undefined) parts.push('colors ' + Math.round(sim.colorOverlap * 100) + '%');
+    if (sim.fontOverlap !== null && sim.fontOverlap !== undefined) parts.push('fonts ' + Math.round(sim.fontOverlap * 100) + '%');
+    if (sim.textOverlap !== null && sim.textOverlap !== undefined) parts.push('text ' + Math.round(sim.textOverlap * 100) + '%');
+    return '<div class="bd-note">Raised to the ' + SIMILARITY_FLOOR + '/100 similarity floor \\u2014 shared ' +
+      (parts.length ? parts.join(', ') : 'visual language') + ' with the design, even where elements didn\\u2019t structurally match.</div>';
   }
   renderScore();
 

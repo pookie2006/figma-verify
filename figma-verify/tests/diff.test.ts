@@ -168,6 +168,60 @@ describe("diffMatches", () => {
   });
 });
 
+describe("diffMatches: similarity floor", () => {
+  it("keeps the score at 0 when nothing structurally matches and nothing resembles the design", () => {
+    const design = Array.from({ length: 10 }, (_, i) => el({ id: `d${i}`, name: `El ${i}` }));
+    const matches: MatchResult[] = design.map((d) => ({ designId: d.id, method: "unmatched" as const }));
+    const report = diffMatches(design, [], matches, tol, { frameName: "F", viewportWidth: 800 });
+    expect(report.fidelityScore).toBe(0);
+    expect(report.similarity.floor).toBe(0);
+  });
+
+  it("lifts a totally-mismatched score off the floor when the implementation shares real visual/copy DNA with the design", () => {
+    // 8 unmatched elements saturates every deduction-based profile to 0
+    // (8 x -15 = -120) — a "totally different layout" case.
+    const design = [
+      el({
+        id: "d0",
+        role: "text",
+        text: "Create your free account",
+        styles: { backgroundColor: "#4f46e5", fontFamily: "Inter" },
+      }),
+      ...Array.from({ length: 7 }, (_, i) => el({ id: `d${i + 1}`, name: `El ${i + 1}` })),
+    ];
+    // A DOM tree with a completely different layout (so nothing matches
+    // structurally) but the same brand color, font, and near-identical copy.
+    const dom = [
+      el({
+        id: "w0",
+        role: "text",
+        text: "Sign up for a free account",
+        bounds: { x: 900, y: 900, w: 40, h: 10 },
+        styles: { backgroundColor: "#4f46e5", fontFamily: "Inter, sans-serif" },
+      }),
+    ];
+    const matches: MatchResult[] = design.map((d) => ({ designId: d.id, method: "unmatched" as const }));
+    const report = diffMatches(design, dom, matches, tol, { frameName: "F", viewportWidth: 800 });
+
+    // Every element is still "missing" from a structural standpoint...
+    expect(report.missing).toHaveLength(8);
+    // ...but the score is no longer a flat 0, because of the shared palette/font/copy.
+    expect(report.similarity.floor).toBeGreaterThan(0);
+    expect(report.similarity.floor).toBeLessThan(35);
+    expect(report.fidelityScore).toBe(report.similarity.floor);
+    expect(report.scores.perElement).toBe(report.similarity.floor);
+    expect(report.scores.strict).toBe(report.similarity.floor);
+  });
+
+  it("never lets the similarity floor override a genuinely good structural score", () => {
+    const design = [el({ id: "d1", role: "text", text: "hi", styles: { fontFamily: "Inter" } })];
+    const dom = [el({ id: "w1", role: "text", text: "hi", styles: { fontFamily: "Inter" } })];
+    const matches: MatchResult[] = [{ designId: "d1", domId: "w1", method: "text" }];
+    const report = diffMatches(design, dom, matches, tol, { frameName: "F", viewportWidth: 800 });
+    expect(report.fidelityScore).toBe(100);
+  });
+});
+
 describe("rgbDistance", () => {
   it("is 0 for identical colors", () => {
     expect(rgbDistance("#4f46e5", "#4f46e5")).toBe(0);

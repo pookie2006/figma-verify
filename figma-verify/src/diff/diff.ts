@@ -1,6 +1,7 @@
 import type { Tolerances } from "../config.js";
 import { generateFixInstructions } from "../report/instructions.js";
 import { computeScores, DEFAULT_SCORING_PROFILE } from "./scoring.js";
+import { computeSimilaritySignals, similarityFloor } from "./similarity.js";
 import type {
   DriftReport,
   ElementReport,
@@ -87,6 +88,14 @@ export function diffMatches(
   tagCascades(designById, elements);
 
   const scores = computeScores(elements);
+  const similaritySignals = computeSimilaritySignals(design, dom);
+  const floor = similarityFloor(similaritySignals);
+  if (floor > 0) {
+    for (const key of Object.keys(scores) as ScoringProfile[]) {
+      scores[key] = Math.max(scores[key], floor);
+    }
+  }
+
   const scoringProfile = meta.scoringProfile ?? DEFAULT_SCORING_PROFILE;
   const fixInstructions = generateFixInstructions(elements, missing, design);
 
@@ -99,6 +108,7 @@ export function diffMatches(
     scoringProfile,
     scores,
     totals,
+    similarity: { ...similaritySignals, floor },
     missing,
     elements,
     fixInstructions,

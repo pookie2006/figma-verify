@@ -18,11 +18,9 @@
  */
 import { readFile, writeFile } from "node:fs/promises";
 import type { FigmaNodesResponse } from "./figma/client.js";
-import { normalizeFigmaTree } from "./figma/normalize.js";
-import { extractFromUrl } from "./web/extract.js";
 import { renderHtmlReport } from "./report/render-html.js";
 import { renderInstructionsMarkdown } from "./report/instructions.js";
-import { runComparison, verifyImplementation, type VerifyOutput } from "./verify.js";
+import { verifyFromFixture, verifyImplementation, type VerifyOutput } from "./verify.js";
 import type { ScoringProfile } from "./types.js";
 
 const SCORING_PROFILES: ScoringProfile[] = ["balanced", "strict", "perElement", "rootCause"];
@@ -81,22 +79,7 @@ try {
     if (!fixturePath || !liveUrl) usage();
 
     const raw = JSON.parse(await readFile(fixturePath, "utf-8")) as FigmaNodesResponse;
-    const firstEntry = Object.values(raw.nodes)[0];
-    if (!firstEntry) throw new Error("Fixture has no nodes.");
-    const rootNode = firstEntry.document;
-
-    const design = normalizeFigmaTree(rootNode);
-    const frame = design[0];
-    if (!frame) throw new Error("Design fixture normalized to zero elements.");
-
-    const width = viewportWidth ?? Math.round(frame.bounds.w);
-    const { elements: dom, screenshotBase64 } = await extractFromUrl(liveUrl, width, frame.bounds.h);
-    output = runComparison(rootNode.name, design, dom, {
-      viewportWidth: width,
-      liveUrl,
-      scoringProfile,
-      screenshotBase64,
-    });
+    output = await verifyFromFixture({ fixture: raw, liveUrl, viewportWidth, scoringProfile });
   } else {
     const [figmaUrl, liveUrl] = positional;
     if (!figmaUrl || !liveUrl) usage();

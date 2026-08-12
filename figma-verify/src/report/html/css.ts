@@ -39,12 +39,22 @@ button, select, input { font: inherit; color: inherit; }
 h1.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; font-family: var(--font-ui); }
 .brand-mark { flex-shrink: 0; color: var(--ink); }
 .inserters { display: flex; align-items: stretch; gap: 8px; flex: 1 1 320px; min-width: 0; }
-.inserter { display: flex; align-items: center; gap: 7px; min-width: 0; flex: 1; padding: 5px 10px; border: 1px dashed var(--border); border-radius: 8px; background: var(--chrome-2); cursor: pointer; }
+.inserter { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1; padding: 5px 10px; border: 1px dashed var(--border); border-radius: 8px; background: var(--chrome-2); cursor: pointer; }
 .inserter:hover, .inserter.has-file { border-style: solid; border-color: var(--accent); background: var(--accent-tint); }
+.inserter-trigger { display: flex; align-items: center; gap: 7px; min-width: 0; flex: 1; cursor: pointer; }
 .inserter-ic { flex-shrink: 0; color: var(--muted); }
 .inserter.has-file .inserter-ic { color: var(--accent-dark); }
 .inserter-kicker { flex-shrink: 0; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .inserter-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--ink); font-weight: 500; }
+.inserter-url-input { flex: 1; min-width: 0; border: none; background: transparent; font-size: 12px; color: var(--ink); font-family: var(--font-ui); outline: none; padding: 0; }
+.inserter-url-input::placeholder { color: var(--muted); }
+.inserter-mode-toggle { flex-shrink: 0; border: none; background: transparent; color: var(--muted); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; cursor: pointer; padding: 2px 5px; border-radius: 5px; }
+.inserter-mode-toggle:hover { background: rgba(0,0,0,0.06); color: var(--ink); }
+.inserter-mode-toggle[aria-pressed="true"] { color: var(--accent-dark); background: var(--accent-tint); }
+.compare-btn { flex-shrink: 0; border: none; border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 700; letter-spacing: 0.01em; background: var(--accent); color: #fff; cursor: pointer; }
+.compare-btn:hover:not(:disabled) { background: var(--accent-dark); }
+.compare-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.compare-btn.busy { opacity: 0.8; cursor: wait; }
 .meta { flex: 0 1 180px; min-width: 0; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .meta strong { color: var(--ink); font-family: var(--font-mono); font-weight: 600; }
 .meta .meta-sep { margin: 0 7px; color: var(--border); }

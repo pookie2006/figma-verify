@@ -122,6 +122,35 @@ describe("renderHtmlReport", () => {
     expect(html).toContain('id="fv-figma-input"');
     expect(html).toContain("Code folder");
     expect(html).toContain("Figma mockup");
+    expect(html).toContain('id="fv-compare"');
+    expect(html).toContain("/api/verify");
+    expect(html).toContain("/api/health");
+  });
+
+  it("lets the Figma inserter toggle to paste-a-link mode", () => {
+    expect(html).toContain('id="fv-figma-url"');
+    expect(html).toContain('id="fv-figma-mode-toggle"');
+    expect(html).toContain("Paste a Figma link");
+    expect(html).toContain("figmaUrl");
+  });
+
+  it("filters heavy/irrelevant upload paths client-side before compare", () => {
+    expect(html).toContain("isExcludedPath");
+    expect(html).toContain("node_modules");
+    expect(html).toContain("MAX_UPLOAD_BYTES");
+    expect(html).toContain("MAX_UPLOAD_FILES");
+  });
+
+  it("distinguishes a lost connection from a JSON compare error", () => {
+    expect(html).toContain("Lost the connection to the studio server");
+  });
+
+  it("lets the Code folder inserter toggle to paste-a-live-URL mode", () => {
+    expect(html).toContain('id="fv-code-url"');
+    expect(html).toContain('id="fv-code-mode-toggle"');
+    expect(html).toContain('id="fv-code-file-trigger"');
+    expect(html).toContain("Paste a live URL");
+    expect(html).toContain("liveUrl");
   });
 
   it("includes a resizable handle on the fix-instructions drawer", () => {

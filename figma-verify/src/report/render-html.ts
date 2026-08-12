@@ -51,18 +51,27 @@ export function renderHtmlReport(input: HtmlReportInput): string {
     <span>Figma Verify</span>
   </h1>
   <div class="inserters" role="group" aria-label="Source inputs">
-    <label class="inserter" id="fv-code-inserter" title="Select the folder with your implementation files">
-      <input type="file" id="fv-code-input" webkitdirectory multiple hidden />
-      <svg class="inserter-ic" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5h5l1.5 1.5H14.5v8H1.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
-      <span class="inserter-kicker">Code folder</span>
-      <span class="inserter-value" id="fv-code-value">Choose folder…</span>
-    </label>
-    <label class="inserter" id="fv-figma-inserter" title="Select a Figma export, design fixture JSON, or mockup image">
-      <input type="file" id="fv-figma-input" accept=".fig,.json,.png,.jpg,.jpeg,.webp,.svg,image/*,application/json" hidden />
-      <svg class="inserter-ic" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 9l2-2.5 2 1.5L11 5.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span class="inserter-kicker">Figma mockup</span>
-      <span class="inserter-value" id="fv-figma-value">Choose file…</span>
-    </label>
+    <div class="inserter" id="fv-code-inserter" title="Select a built/static implementation folder, or paste a running dev server URL">
+      <label class="inserter-trigger" id="fv-code-file-trigger">
+        <input type="file" id="fv-code-input" webkitdirectory multiple hidden />
+        <svg class="inserter-ic" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5h5l1.5 1.5H14.5v8H1.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        <span class="inserter-kicker">Code folder</span>
+        <span class="inserter-value" id="fv-code-value">Choose folder…</span>
+      </label>
+      <input type="text" id="fv-code-url" class="inserter-url-input" placeholder="Paste a live URL (http://localhost:3000/...)" hidden aria-label="Live implementation URL" />
+      <button type="button" id="fv-code-mode-toggle" class="inserter-mode-toggle" aria-pressed="false" title="Paste a live URL instead of uploading a folder">Link</button>
+    </div>
+    <div class="inserter" id="fv-figma-inserter" title="Paste a Figma link (design/file/proto), or upload a nodes-API fixture JSON">
+      <label class="inserter-trigger" id="fv-figma-file-trigger">
+        <input type="file" id="fv-figma-input" accept=".json,application/json,.png,.jpg,.jpeg,.webp,.svg,image/*" hidden />
+        <svg class="inserter-ic" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 9l2-2.5 2 1.5L11 5.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="inserter-kicker">Figma mockup</span>
+        <span class="inserter-value" id="fv-figma-value">Choose file…</span>
+      </label>
+      <input type="text" id="fv-figma-url" class="inserter-url-input" placeholder="Paste Figma link (figma.com/design|file|proto/...?node-id=...)" hidden aria-label="Figma link" />
+      <button type="button" id="fv-figma-mode-toggle" class="inserter-mode-toggle" aria-pressed="false" title="Paste a Figma link instead of a file">Link</button>
+    </div>
+    <button type="button" id="fv-compare" class="compare-btn" disabled title="Requires the local studio server (npm run studio)">Compare</button>
   </div>
   <div class="meta" id="fv-meta"></div>
   <button class="panel-toggle-btn" id="fv-toggle-inspect" type="button" aria-expanded="false" aria-controls="fv-inspect">Score</button>

@@ -1,5 +1,5 @@
 import { mergeTolerances, type Tolerances } from "./config.js";
-import { fetchFigmaNode, type FigmaNode } from "./figma/client.js";
+import { fetchFigmaNode, type FigmaNode, type FigmaNodesResponse } from "./figma/client.js";
 import { normalizeFigmaTree } from "./figma/normalize.js";
 import { parseFigmaUrl } from "./figma/url.js";
 import { extractFromUrl } from "./web/extract.js";
@@ -46,6 +46,40 @@ export async function verifyImplementation(options: VerifyOptions): Promise<Veri
   return runComparison(rootNode.name, design, dom, {
     viewportWidth,
     figmaUrl: options.figmaUrl,
+    liveUrl: options.liveUrl,
+    tolerances: options.tolerances,
+    scoringProfile: options.scoringProfile,
+    screenshotBase64,
+  });
+}
+
+/**
+ * Offline / upload path: recorded Figma nodes-API JSON + a live URL
+ * (http(s) or file://) that Playwright can open.
+ */
+export async function verifyFromFixture(options: {
+  fixture: FigmaNodesResponse;
+  liveUrl: string;
+  viewportWidth?: number;
+  tolerances?: Partial<Tolerances>;
+  scoringProfile?: ScoringProfile;
+}): Promise<VerifyOutput> {
+  const firstEntry = Object.values(options.fixture.nodes)[0];
+  if (!firstEntry?.document) throw new Error("Fixture has no nodes.");
+  const rootNode = firstEntry.document;
+  const design = normalizeFigmaTree(rootNode);
+  const frame = design[0];
+  if (!frame) throw new Error("Design fixture normalized to zero elements.");
+
+  const viewportWidth = options.viewportWidth ?? Math.round(frame.bounds.w);
+  const { elements: dom, screenshotBase64 } = await extractFromUrl(
+    options.liveUrl,
+    viewportWidth,
+    frame.bounds.h
+  );
+
+  return runComparison(rootNode.name, design, dom, {
+    viewportWidth,
     liveUrl: options.liveUrl,
     tolerances: options.tolerances,
     scoringProfile: options.scoringProfile,
