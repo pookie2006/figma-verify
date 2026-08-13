@@ -280,7 +280,12 @@ npm run studio          # http://127.0.0.1:4174
 
 CLI/MCP remain the headless path (`--fixture` + live URL, or a Figma URL + `FIGMA_TOKEN`).
 
-**"Figma API rate limit exceeded (429)"**: Figma's REST API allows a limited number of requests per minute per token, and clicking Compare repeatedly for the same design (e.g. while iterating on the implementation) can hit it. The studio caches a fetched design (by file key + node id) for 5 minutes per run, so re-comparing the *same* Figma link only re-fetches once — the error should be rare unless you're also switching between several different Figma links in quick succession. If you do hit it, `fetchFigmaNode` already retries a few times with backoff before giving up; if it still fails, wait a minute or two and try again.
+**"Figma API rate limit exceeded (429)"**: clicking Compare repeatedly for the same design (e.g. while iterating on the implementation) can hit Figma's REST API rate limit. Two things that are easy to get wrong here:
+
+- **A new personal access token won't help.** Figma tracks personal-access-token limits per *account* (whoever generated the token), not per token string — a second token from the same account draws from the same budget. ([Figma's rate-limit docs](https://developers.figma.com/docs/rest-api/rate-limits/))
+- **The limit depends on the plan of the Figma *file*, not just your seat.** A file living in a free "Starter" plan is capped as low as 6 requests/**month** for `GET file nodes` (what this tool calls), even if you have a paid seat elsewhere — vs. 10–20/**minute** for a Dev/Full seat on a Professional+ file. If you keep hitting this on the same file, check what plan it's in; moving/duplicating it into a paid team is the actual fix, not a new token.
+
+The studio caches a fetched design (by file key + node id) for 5 minutes per run, so re-comparing the *same* Figma link only re-fetches once — this alone should make the error rare unless you're also switching between several different Figma links in quick succession, or the file is on a Starter plan. `fetchFigmaNode` retries 429s a few times with backoff before giving up; the resulting error message echoes Figma's own `X-Figma-Plan-Tier` / `X-Figma-Rate-Limit-Type` headers when present, so you can see exactly which limit you hit.
 
 ## Tests
 

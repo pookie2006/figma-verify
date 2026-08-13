@@ -93,6 +93,22 @@ describe("fetchFigmaNode", () => {
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
+  it("tells the caller a new token won't help and surfaces Figma's diagnostic headers", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(429, { err: "rate limited" }, {
+        "retry-after": "0",
+        "x-figma-plan-tier": "starter",
+        "x-figma-rate-limit-type": "file-nodes",
+        "x-figma-upgrade-link": "https://figma.com/upgrade",
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchFigmaNode(ref, "tok")).rejects.toThrow(/won't help/i);
+    await expect(fetchFigmaNode(ref, "tok")).rejects.toThrow(/starter/i);
+    await expect(fetchFigmaNode(ref, "tok")).rejects.toThrow(/figma\.com\/upgrade/i);
+  });
+
   it("does not cache a failed (429) fetch", async () => {
     const node: FigmaNode = { id: "1:2", name: "Frame", type: "FRAME" };
     const fetchMock = vi
