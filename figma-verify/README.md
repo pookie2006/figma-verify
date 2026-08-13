@@ -32,6 +32,9 @@ Figma Verify closes the loop. The agent implements, verifies, reads the drift re
 ![Figma Verify on Spectator's Sources: fidelity 38.9, side-by-side design vs implementation, 33 agent fix instructions](../docs/spec-demo-image.png)
 *The same report, run on the author's own [Columbia Daily Spectator](https://www.columbiaspectator.com/) work — Spectator's Sources (fidelity 38.9, 19 missing elements, 33 ordered fixes).*
 
+![Terminal drift report: fidelity score, missing elements, property diffs, and ordered fix instructions](../docs/cli-terminal-output.png)
+*The same compare in the terminal — missing elements, property diffs, and ordered fix instructions.*
+
 <details>
 <summary>Mobile view (390px)</summary>
 

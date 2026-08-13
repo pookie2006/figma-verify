@@ -12,6 +12,10 @@
 
 *A real compare on the author's own [Columbia Daily Spectator](https://www.columbiaspectator.com/) work — Spectator's Sources (fidelity 38.9, 19 missing elements, 33 ordered fixes).*
 
+![Terminal drift report: fidelity score, missing elements, property diffs, and ordered fix instructions](docs/cli-terminal-output.png)
+
+*The same compare in the terminal — missing elements, property diffs, and ordered fix instructions.*
+
 You can compare in the **terminal** (markdown drift report) and in the **visual report** (side-by-side UI). Same inputs either way: a localhost URL and a Figma frame link. File upload is still a work in progress.
 
 ### Shared setup
