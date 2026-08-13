@@ -13,6 +13,43 @@ export function coerceScoringProfile(value?: string | null): ScoringProfile | un
 }
 
 /**
+ * Fetch a nodes-API fixture JSON from an http(s) URL. Used when the Figma
+ * inserter is in Link mode but the pasted URL is a public fixture (the
+ * recruiter demo on GitHub Pages) rather than a figma.com file.
+ */
+export async function fetchFixtureFromUrl(raw: string): Promise<import("../figma/client.js").FigmaNodesResponse> {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error(`Not a valid URL: ${raw}`);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`Unsupported URL scheme "${parsed.protocol}". Use http:// or https://.`);
+  }
+  let res: Response;
+  try {
+    res = await fetch(parsed.href, { headers: { accept: "application/json, text/plain, */*" } });
+  } catch {
+    throw new Error(`Could not fetch fixture JSON from ${parsed.href}`);
+  }
+  if (!res.ok) {
+    throw new Error(`Fixture URL returned ${res.status}: ${parsed.href}`);
+  }
+  const text = await res.text();
+  let fixture: import("../figma/client.js").FigmaNodesResponse;
+  try {
+    fixture = JSON.parse(text);
+  } catch {
+    throw new Error(`URL is not a Figma fixture JSON: ${parsed.href}`);
+  }
+  if (!fixture?.nodes || typeof fixture.nodes !== "object") {
+    throw new Error(`URL is not a nodes-API fixture ({ "nodes": { ... } }): ${parsed.href}`);
+  }
+  return fixture;
+}
+
+/**
  * Decide the design source from the studio verify form: a pasted Figma URL
  * takes precedence (real API, needs FIGMA_TOKEN server-side); otherwise a
  * design-fixture JSON upload. Images are rejected — preview-only, no
@@ -26,10 +63,16 @@ export async function resolveDesignSource(form: {
 }): Promise<DesignSource> {
   const trimmedUrl = form.figmaUrl?.trim();
   if (trimmedUrl) {
-    if (!/^https?:\/\/([a-z0-9-]+\.)*figma\.com\//i.test(trimmedUrl)) {
-      throw new Error(`Not a figma.com URL: ${trimmedUrl}`);
+    if (/^https?:\/\/([a-z0-9-]+\.)*figma\.com\//i.test(trimmedUrl)) {
+      return { kind: "figmaUrl", figmaUrl: trimmedUrl };
     }
-    return { kind: "figmaUrl", figmaUrl: trimmedUrl };
+    // Public fixture JSON URL (e.g. the GitHub Pages copy of
+    // demo/design-fixture.json) — lets a recruiter paste two links
+    // with no FIGMA_TOKEN and no file upload.
+    if (/^https?:\/\//i.test(trimmedUrl)) {
+      return { kind: "fixture", fixture: await fetchFixtureFromUrl(trimmedUrl) };
+    }
+    throw new Error(`Not a figma.com URL or a fixture JSON URL: ${trimmedUrl}`);
   }
 
   if (!form.fixtureName) {

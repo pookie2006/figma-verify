@@ -133,6 +133,7 @@ describe("renderHtmlReport", () => {
     expect(html).toContain("Paste a Figma link");
     expect(html).toContain("figmaUrl");
     expect(html).toContain("File upload is a work in progress");
+    expect(html).toContain("public fixture JSON URL");
   });
 
   it("filters heavy/irrelevant upload paths client-side before compare", () => {

@@ -68,7 +68,7 @@ export function renderHtmlReport(input: HtmlReportInput): string {
         <span class="inserter-kicker">Figma mockup</span>
         <span class="inserter-value" id="fv-figma-value">Choose file…</span>
       </label>
-      <input type="text" id="fv-figma-url" class="inserter-url-input" placeholder="Paste Figma link (figma.com/design|file|proto/...?node-id=...)" hidden aria-label="Figma link" />
+      <input type="text" id="fv-figma-url" class="inserter-url-input" placeholder="Paste a Figma link, or a public fixture JSON URL" hidden aria-label="Figma link" />
       <button type="button" id="fv-figma-mode-toggle" class="inserter-mode-toggle" aria-pressed="false" title="Paste a Figma link instead of a file">Link</button>
       <button type="button" id="fv-figma-save-fixture" class="inserter-mode-toggle" hidden title="Save this Figma link as a local fixture JSON, so future compares don't re-hit the Figma API (helps avoid rate limits)">Save fixture</button>
     </div>

@@ -37,6 +37,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "../..");
 const demoDir = join(root, "demo");
 const PORT = Number(process.env.PORT ?? 4174);
+/** Forever-on demo implementation for recruiter/link-mode testing. */
+const IMPL_PORT = Number(process.env.IMPL_PORT ?? 4173);
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -383,9 +385,36 @@ async function main(): Promise<void> {
   server.requestTimeout = 5 * 60_000;
   server.headersTimeout = 60_000;
 
+  // Recruiter/demo implementation: always available at a stable localhost
+  // URL so Link mode has something to paste without a separate `npm run
+  // demo:serve`. Same files as demo/index.html.
+  const implHtml = await readFile(join(demoDir, "index.html"));
+  await writeFile(join(demoDir, "demo-implementation.html"), implHtml);
+  const implServer = createServer((req, res) => {
+    const pathname = new URL(req.url ?? "/", `http://127.0.0.1:${IMPL_PORT}`).pathname;
+    const file = pathname === "/" || pathname === "/index.html" ? "index.html" : pathname.replace(/^\/+/, "");
+    const abs = join(demoDir, file);
+    const resolved = normalize(abs);
+    if (!resolved.startsWith(normalize(demoDir) + sep) && resolved !== normalize(demoDir)) {
+      res.writeHead(403).end("forbidden");
+      return;
+    }
+    serveStatic(res, resolved);
+  });
+  implServer.listen(IMPL_PORT, "127.0.0.1", () => {
+    console.log(`Demo implementation (paste as Code link) → http://127.0.0.1:${IMPL_PORT}/`);
+  });
+  implServer.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.log(`Demo implementation already running on http://127.0.0.1:${IMPL_PORT}/ (reusing it).`);
+    } else {
+      console.log(`Could not start demo implementation on ${IMPL_PORT}: ${err.message}`);
+    }
+  });
+
   server.listen(PORT, "127.0.0.1", () => {
     console.log(`Figma Verify studio → http://127.0.0.1:${PORT}`);
-    console.log("Upload a code folder + design-fixture JSON, then click Compare.");
+    console.log("Prefer Link mode: Code = http://127.0.0.1:4173/  ·  Figma = public fixture JSON or a figma.com URL");
   });
 }
 
