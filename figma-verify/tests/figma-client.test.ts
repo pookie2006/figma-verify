@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearFigmaNodeCache, fetchFigmaNode, type FigmaNode, type FigmaNodesResponse } from "../src/figma/client.js";
+import {
+  clearFigmaNodeCache,
+  fetchFigmaNode,
+  fetchFigmaNodesResponse,
+  type FigmaNode,
+  type FigmaNodesResponse,
+} from "../src/figma/client.js";
 import type { FigmaRef } from "../src/figma/url.js";
 
 const ref: FigmaRef = { fileKey: "ABC123", nodeId: "1:2" };
@@ -93,6 +99,22 @@ describe("fetchFigmaNode", () => {
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
+  it("tells the caller a new token won't help and surfaces Figma's diagnostic headers", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(429, { err: "rate limited" }, {
+        "retry-after": "0",
+        "x-figma-plan-tier": "starter",
+        "x-figma-rate-limit-type": "file-nodes",
+        "x-figma-upgrade-link": "https://figma.com/upgrade",
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchFigmaNode(ref, "tok")).rejects.toThrow(/won't help/i);
+    await expect(fetchFigmaNode(ref, "tok")).rejects.toThrow(/starter/i);
+    await expect(fetchFigmaNode(ref, "tok")).rejects.toThrow(/figma\.com\/upgrade/i);
+  });
+
   it("does not cache a failed (429) fetch", async () => {
     const node: FigmaNode = { id: "1:2", name: "Frame", type: "FRAME" };
     const fetchMock = vi
@@ -127,5 +149,37 @@ describe("fetchFigmaNode", () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { name: "f", nodes: {} }));
     vi.stubGlobal("fetch", fetchMock);
     await expect(fetchFigmaNode(ref, "tok")).rejects.toThrow(/not present in the API response/);
+  });
+});
+
+describe("fetchFigmaNodesResponse", () => {
+  beforeEach(() => {
+    clearFigmaNodeCache();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("shapes the result as a saveable nodes-API fixture", async () => {
+    const node: FigmaNode = { id: "1:2", name: "Signup Card", type: "FRAME" };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, nodesResponse(node)));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const fixture = await fetchFigmaNodesResponse(ref, "tok");
+    expect(fixture).toEqual({ name: "Signup Card", nodes: { "1:2": { document: node } } });
+    // Same shape verifyFromFixture / --fixture expect (see design-fixture.json).
+    expect(fixture.nodes[ref.nodeId]?.document).toEqual(node);
+  });
+
+  it("shares fetchFigmaNode's cache, so it's free right after a compare already fetched the same ref", async () => {
+    const node: FigmaNode = { id: "1:2", name: "Frame", type: "FRAME" };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, nodesResponse(node)));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchFigmaNode(ref, "tok"); // e.g. what a Compare already did
+    await fetchFigmaNodesResponse(ref, "tok"); // saving a fixture afterwards
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

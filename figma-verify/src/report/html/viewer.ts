@@ -151,6 +151,7 @@ export const VIEWER_JS = `
   var figmaFileTrigger = document.getElementById('fv-figma-file-trigger');
   var figmaUrlInput = document.getElementById('fv-figma-url');
   var figmaModeToggle = document.getElementById('fv-figma-mode-toggle');
+  var figmaSaveFixtureBtn = document.getElementById('fv-figma-save-fixture');
   var codeValue = document.getElementById('fv-code-value');
   var figmaValue = document.getElementById('fv-figma-value');
   var codeInserter = document.getElementById('fv-code-inserter');
@@ -253,6 +254,10 @@ export const VIEWER_JS = `
   codeUrlInput.addEventListener('blur', commitCodeUrl);
 
   // ---------- Figma inserter: toggle between file upload and paste-a-link ----------
+  function syncFigmaSaveFixtureBtn() {
+    figmaSaveFixtureBtn.hidden = !pendingFigmaUrl;
+  }
+
   function setFigmaMode(mode) {
     var isUrl = mode === 'url';
     figmaModeToggle.setAttribute('aria-pressed', isUrl ? 'true' : 'false');
@@ -274,6 +279,7 @@ export const VIEWER_JS = `
       figmaUrlInput.value = '';
       figmaInserter.classList.remove('has-file');
     }
+    syncFigmaSaveFixtureBtn();
     updateMeta(activeScore);
     syncCompareBtn();
   }
@@ -289,6 +295,7 @@ export const VIEWER_JS = `
       pendingFigmaUrl = '';
       sources.figma = null;
       figmaInserter.classList.remove('has-file');
+      syncFigmaSaveFixtureBtn();
       syncCompareBtn();
       return;
     }
@@ -299,6 +306,7 @@ export const VIEWER_JS = `
     pendingFigmaUrl = raw;
     sources.figma = raw;
     figmaInserter.classList.add('has-file');
+    syncFigmaSaveFixtureBtn();
     updateMeta(activeScore);
     showToast('Figma link set \\u2014 ready to compare');
     syncCompareBtn();
@@ -307,7 +315,59 @@ export const VIEWER_JS = `
   figmaUrlInput.addEventListener('keydown', function (e) {
     if (e.key === 'Enter') { e.preventDefault(); commitFigmaUrl(); }
   });
+
+  function downloadJsonFile(obj, filename) {
+    var blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  figmaSaveFixtureBtn.addEventListener('click', function () {
+    if (!pendingFigmaUrl) {
+      showToast('Paste and set a Figma link first');
+      return;
+    }
+    figmaSaveFixtureBtn.disabled = true;
+    var prevText = figmaSaveFixtureBtn.textContent;
+    figmaSaveFixtureBtn.textContent = 'Saving\\u2026';
+    fetch('/api/figma-fixture?url=' + encodeURIComponent(pendingFigmaUrl))
+      .catch(function () {
+        throw new Error('Lost the connection to the studio server (npm run studio).');
+      })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.body || !res.body.fixture) {
+          throw new Error((res.body && res.body.error) || 'Could not fetch this Figma link');
+        }
+        var filename = res.body.suggestedFilename || 'design-fixture.json';
+        downloadJsonFile(res.body.fixture, filename);
+        showToast('Saved ' + filename + ' \\u2014 use File mode to compare offline without hitting the Figma API again');
+      })
+      .catch(function (err) {
+        showToast(err.message || 'Could not save this Figma link as a fixture');
+      })
+      .then(function () {
+        figmaSaveFixtureBtn.disabled = false;
+        figmaSaveFixtureBtn.textContent = prevText;
+      });
+  });
   figmaUrlInput.addEventListener('blur', commitFigmaUrl);
+
+  // If this report came from a live Figma-URL compare, the link that was
+  // just fetched is already known — surface "Save fixture" immediately so
+  // it can be saved offline without having to re-paste the same URL (and
+  // without spending another API call just to re-enter it).
+  if (report.figmaUrl) {
+    pendingFigmaUrl = report.figmaUrl;
+    sources.figma = report.figmaUrl;
+    syncFigmaSaveFixtureBtn();
+  }
 
   function probeStudio() {
     if (studioReady !== null) return Promise.resolve(studioReady);

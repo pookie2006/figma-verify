@@ -15,7 +15,8 @@ import { dirname, extname, join, normalize, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import type { AddressInfo } from "node:net";
-import type { FigmaNodesResponse } from "../figma/client.js";
+import { fetchFigmaNodesResponse, type FigmaNodesResponse } from "../figma/client.js";
+import { parseFigmaUrl } from "../figma/url.js";
 import { renderHtmlReport } from "../report/render-html.js";
 import { verifyFromFixture, verifyImplementation } from "../verify.js";
 import {
@@ -256,6 +257,28 @@ async function handleVerify(req: IncomingMessage, res: ServerResponse): Promise<
   }
 }
 
+/**
+ * Fetch a Figma URL's node tree shaped as a saveable nodes-API fixture
+ * (`design-fixture.json`), so a rate-limit-constrained account can spend
+ * one fetch and then compare against the saved file indefinitely instead
+ * of re-hitting the Figma API on every Compare. Shares fetchFigmaNode's
+ * cache, so calling this right after a compare with the same URL is free.
+ */
+async function handleFigmaFixture(res: ServerResponse, url: URL): Promise<void> {
+  const figmaUrl = url.searchParams.get("url");
+  if (!figmaUrl) {
+    sendJson(res, 400, { ok: false, error: "Missing ?url=<figma link> query parameter." });
+    return;
+  }
+  try {
+    const ref = parseFigmaUrl(figmaUrl);
+    const fixture = await fetchFigmaNodesResponse(ref);
+    sendJson(res, 200, { ok: true, fixture, suggestedFilename: `design-fixture-${ref.fileKey}.json` });
+  } catch (err) {
+    sendJson(res, 400, { ok: false, error: (err as Error).message });
+  }
+}
+
 async function ensureReportHtml(): Promise<void> {
   const reportPath = join(demoDir, "report.html");
   if (existsSync(reportPath)) return;
@@ -298,6 +321,10 @@ async function main(): Promise<void> {
       }
       if (req.method === "POST" && url.pathname === "/api/verify") {
         await handleVerify(req, res);
+        return;
+      }
+      if (req.method === "GET" && url.pathname === "/api/figma-fixture") {
+        await handleFigmaFixture(res, url);
         return;
       }
       if (req.method === "GET") {
