@@ -27,7 +27,7 @@ Figma Verify closes the loop. The agent implements, verifies, reads the drift re
 ```
 
 ![Figma Verify report: fidelity score, side-by-side design vs implementation, layers tree, and agent fix instructions](../docs/recruiter-report.png)
-*Generated from the bundled Signup Card demo — every pixel of this UI is real output, not a mockup.*
+*Generated from the bundled Signup Card demo — every pixel of this UI is real output, not a mockup. The same compare has also been run on the author's own personal projects for the [Columbia Daily Spectator](https://www.columbiaspectator.com/), including Spectator's Sources.*
 
 ![Figma Verify on Spectator's Sources: fidelity 38.9, side-by-side design vs implementation, 33 agent fix instructions](../docs/spec-demo-image.png)
 *The same report, run on the author's own [Columbia Daily Spectator](https://www.columbiaspectator.com/) work — Spectator's Sources (fidelity 38.9, 19 missing elements, 33 ordered fixes).*
@@ -270,14 +270,16 @@ npm run studio                # report → http://127.0.0.1:4174
                               # demo implementation stays up on http://127.0.0.1:4173/
 ```
 
-**Recruiter / first-run pair (no Figma token needed):**
+**Recruiter / first-run pair:** click **Load demo** (Signup Card, no token), or paste a real Figma link:
 
 | Inserter | Mode | Paste this |
 |---|---|---|
 | Code folder | **Link** | `http://127.0.0.1:4173/` |
-| Figma mockup | **Link** | `https://pookie2006.github.io/figma-verify/design-fixture.json` |
+| Figma mockup | **Link** | `https://www.figma.com/design/qWrhGNCtP9avcXdYiaBVxE/Buttons-Library--Community-?node-id=1-5` |
 
-The Code link is the bundled, deliberately flawed Signup Card. The studio keeps it listening on port 4173 until you stop the process. The Figma link is a **public** copy of that card’s nodes-API fixture on GitHub Pages — pasteable by anyone, no private Figma file and no `FIGMA_TOKEN`.
+That Figma URL is a public community [Buttons Library](https://www.figma.com/design/qWrhGNCtP9avcXdYiaBVxE/Buttons-Library--Community-?node-id=1-5) — a `figma.com` design/file link the Link field accepts. Needs `FIGMA_TOKEN` in the same terminal as `npm run studio`. Drift against the Signup Card demo is expected (different designs).
+
+For a token-free pair that matches the Signup Card, click **Load demo**.
 
 **Your own project (still prefer Link):**
 

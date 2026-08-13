@@ -1,6 +1,13 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ScoringProfile } from "../types.js";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const bundledDemoFixturePath = join(here, "../../demo/design-fixture.json");
+
+const FIGMA_HOST_RE = /^https?:\/\/([a-z0-9-]+\.)*figma\.com\//i;
+const HTTP_URL_RE = /^https?:\/\//i;
 
 export type DesignSource =
   | { kind: "fixture"; fixture: import("../figma/client.js").FigmaNodesResponse }
@@ -12,10 +19,44 @@ export function coerceScoringProfile(value?: string | null): ScoringProfile | un
   return VALID_SCORING.includes(value as ScoringProfile) ? (value as ScoringProfile) : undefined;
 }
 
+export function isFigmaFileUrl(raw: string): boolean {
+  return FIGMA_HOST_RE.test(raw.trim());
+}
+
+/**
+ * Recruiter/demo URLs that mean "use the bundled Signup Card fixture"
+ * rather than fetch a remote Figma file. The Link field used to reject
+ * anything that wasn't figma.com, and the GitHub Pages copy 404s until
+ * `docs/design-fixture.json` is on `main`. Both the studio-served file
+ * and the Pages URL resolve to `demo/design-fixture.json` on disk.
+ */
+export function isBundledDemoFixtureUrl(raw: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw.trim());
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+  const path = parsed.pathname.replace(/\/+$/, "") || "/";
+  if (!path.endsWith("design-fixture.json")) return false;
+  const host = parsed.hostname.toLowerCase();
+  return host === "127.0.0.1" || host === "localhost" || host === "0.0.0.0" || host === "pookie2006.github.io";
+}
+
+export async function loadBundledDemoFixture(): Promise<import("../figma/client.js").FigmaNodesResponse> {
+  const text = await readFile(bundledDemoFixturePath, "utf-8");
+  const fixture = JSON.parse(text) as import("../figma/client.js").FigmaNodesResponse;
+  if (!fixture?.nodes || typeof fixture.nodes !== "object") {
+    throw new Error("Bundled demo fixture is missing a nodes-API `nodes` object.");
+  }
+  return fixture;
+}
+
 /**
  * Fetch a nodes-API fixture JSON from an http(s) URL. Used when the Figma
- * inserter is in Link mode but the pasted URL is a public fixture (the
- * recruiter demo on GitHub Pages) rather than a figma.com file.
+ * inserter is in Link mode but the pasted URL is a public fixture rather
+ * than a figma.com file.
  */
 export async function fetchFixtureFromUrl(raw: string): Promise<import("../figma/client.js").FigmaNodesResponse> {
   let parsed: URL;
@@ -63,13 +104,15 @@ export async function resolveDesignSource(form: {
 }): Promise<DesignSource> {
   const trimmedUrl = form.figmaUrl?.trim();
   if (trimmedUrl) {
-    if (/^https?:\/\/([a-z0-9-]+\.)*figma\.com\//i.test(trimmedUrl)) {
+    if (isFigmaFileUrl(trimmedUrl)) {
       return { kind: "figmaUrl", figmaUrl: trimmedUrl };
     }
-    // Public fixture JSON URL (e.g. the GitHub Pages copy of
-    // demo/design-fixture.json) — lets a recruiter paste two links
-    // with no FIGMA_TOKEN and no file upload.
-    if (/^https?:\/\//i.test(trimmedUrl)) {
+    // Bundled Signup Card fixture (studio / GitHub Pages URLs) — no
+    // FIGMA_TOKEN, no network fetch, no figma.com link required.
+    if (isBundledDemoFixtureUrl(trimmedUrl)) {
+      return { kind: "fixture", fixture: await loadBundledDemoFixture() };
+    }
+    if (HTTP_URL_RE.test(trimmedUrl)) {
       return { kind: "fixture", fixture: await fetchFixtureFromUrl(trimmedUrl) };
     }
     throw new Error(`Not a figma.com URL or a fixture JSON URL: ${trimmedUrl}`);

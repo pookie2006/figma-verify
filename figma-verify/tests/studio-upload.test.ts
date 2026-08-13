@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import {
   coerceScoringProfile,
   exceedsUploadLimits,
+  isBundledDemoFixtureUrl,
   isExcludedUploadPath,
+  isFigmaFileUrl,
   MAX_UPLOAD_BYTES,
   MAX_UPLOAD_FILES,
   pickEntry,
@@ -71,17 +73,45 @@ describe("studio upload helpers", () => {
     vi.unstubAllGlobals();
   });
 
-  it("resolveDesignSource accepts a public http(s) fixture JSON URL", async () => {
-    const body = { name: "Signup Card", nodes: { "1:2": { document: { id: "1:2", name: "Signup Card" } } } };
+  it("recognizes figma.com file URLs vs bundled demo fixture JSON URLs", () => {
+    expect(isFigmaFileUrl("https://www.figma.com/design/abc/Name?node-id=1-2")).toBe(true);
+    expect(isFigmaFileUrl("http://127.0.0.1:4174/design-fixture.json")).toBe(false);
+    expect(isBundledDemoFixtureUrl("http://127.0.0.1:4174/design-fixture.json")).toBe(true);
+    expect(isBundledDemoFixtureUrl("http://localhost:4174/design-fixture.json")).toBe(true);
+    expect(isBundledDemoFixtureUrl("https://pookie2006.github.io/figma-verify/design-fixture.json")).toBe(true);
+    expect(isBundledDemoFixtureUrl("https://example.com/design-fixture.json")).toBe(false);
+    expect(isBundledDemoFixtureUrl("https://www.figma.com/design/abc/Name?node-id=1-2")).toBe(false);
+  });
+
+  it("resolveDesignSource loads the bundled demo fixture for studio/Pages JSON URLs without fetching", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await resolveDesignSource({
+      figmaUrl: "http://127.0.0.1:4174/design-fixture.json",
+    });
+    expect(result.kind).toBe("fixture");
+    if (result.kind === "fixture") expect(result.fixture.nodes).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const pages = await resolveDesignSource({
+      figmaUrl: "https://pookie2006.github.io/figma-verify/design-fixture.json",
+    });
+    expect(pages.kind).toBe("fixture");
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("resolveDesignSource fetches a non-bundled http(s) fixture JSON URL", async () => {
+    const body = { name: "Remote Card", nodes: { "1:2": { document: { id: "1:2", name: "Remote Card" } } } };
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } })
     );
     vi.stubGlobal("fetch", fetchMock);
     const result = await resolveDesignSource({
-      figmaUrl: "https://pookie2006.github.io/figma-verify/design-fixture.json",
+      figmaUrl: "https://example.com/fixtures/signup.json",
     });
     expect(result.kind).toBe("fixture");
-    if (result.kind === "fixture") expect(result.fixture.name).toBe("Signup Card");
+    if (result.kind === "fixture") expect(result.fixture.name).toBe("Remote Card");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
   });

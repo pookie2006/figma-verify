@@ -283,7 +283,12 @@ async function handleFigmaFixture(res: ServerResponse, url: URL): Promise<void> 
 
 async function ensureReportHtml(): Promise<void> {
   const reportPath = join(demoDir, "report.html");
-  if (existsSync(reportPath)) return;
+  if (existsSync(reportPath)) {
+    const existing = await readFile(reportPath, "utf-8");
+    // Older generated reports only accepted figma.com URLs in Link mode.
+    // Rebuild so Load demo + fixture JSON URLs are actually in the served UI.
+    if (existing.includes('id="fv-load-demo"')) return;
+  }
   const fixture = JSON.parse(
     await readFile(join(demoDir, "design-fixture.json"), "utf-8")
   ) as FigmaNodesResponse;
@@ -347,7 +352,15 @@ async function main(): Promise<void> {
     const url = new URL(req.url ?? "/", `http://127.0.0.1:${PORT}`);
     try {
       if (req.method === "GET" && url.pathname === "/api/health") {
-        sendJson(res, 200, { ok: true, studio: true, figmaIdentity });
+        sendJson(res, 200, {
+          ok: true,
+          studio: true,
+          figmaIdentity,
+          demo: {
+            codeUrl: `http://127.0.0.1:${IMPL_PORT}/`,
+            designUrl: `http://127.0.0.1:${PORT}/design-fixture.json`,
+          },
+        });
         return;
       }
       if (req.method === "POST" && url.pathname === "/api/verify") {
@@ -414,7 +427,9 @@ async function main(): Promise<void> {
 
   server.listen(PORT, "127.0.0.1", () => {
     console.log(`Figma Verify studio → http://127.0.0.1:${PORT}`);
-    console.log("Prefer Link mode: Code = http://127.0.0.1:4173/  ·  Figma = public fixture JSON or a figma.com URL");
+    console.log(
+      `Prefer Link mode: Code = http://127.0.0.1:${IMPL_PORT}/  ·  Figma = http://127.0.0.1:${PORT}/design-fixture.json (fixture JSON, no token) or a figma.com URL`
+    );
   });
 }
 
