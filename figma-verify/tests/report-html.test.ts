@@ -153,6 +153,13 @@ describe("renderHtmlReport", () => {
     expect(html).toContain("liveUrl");
   });
 
+  it("lets a Figma-link comparison be saved as an offline fixture, to avoid re-hitting the API", () => {
+    expect(html).toContain('id="fv-figma-save-fixture"');
+    expect(html).toContain("/api/figma-fixture");
+    expect(html).toContain("downloadJsonFile");
+    expect(html).toContain("suggestedFilename");
+  });
+
   it("includes a resizable handle on the fix-instructions drawer", () => {
     expect(html).toContain('id="fv-drawer-resize"');
     expect(html).toContain('role="separator"');

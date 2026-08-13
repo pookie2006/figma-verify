@@ -287,6 +287,8 @@ CLI/MCP remain the headless path (`--fixture` + live URL, or a Figma URL + `FIGM
 
 The studio caches a fetched design (by file key + node id) for 5 minutes per run, so re-comparing the *same* Figma link only re-fetches once — this alone should make the error rare unless you're also switching between several different Figma links in quick succession, or the file is on a Starter plan. `fetchFigmaNode` retries 429s a few times with backoff before giving up; the resulting error message echoes Figma's own `X-Figma-Plan-Tier` / `X-Figma-Rate-Limit-Type` headers when present, so you can see exactly which limit you hit.
 
+**Still want to keep iterating without touching the Figma API at all?** Once you've pasted a Figma link and it's set (shown by the **Save fixture** button appearing next to it — also appears automatically right after a live Figma-URL compare), click it: the studio fetches the design once (reusing the cache above if you just compared, so it's free) and downloads it as a `design-fixture.json`. Switch the Figma inserter to **File** mode and upload that file for every subsequent Compare — it's a byte-for-byte offline copy, so from then on you can re-run Compare as many times as you want while you fix the implementation, with zero further Figma API calls, until the design itself actually changes.
+
 ## Tests
 
 ```bash

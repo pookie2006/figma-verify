@@ -181,3 +181,23 @@ export async function fetchFigmaNode(
   nodeCache.set(cacheKey, { node: entry.document, fetchedAt: Date.now() });
   return entry.document;
 }
+
+/**
+ * Fetch the same node as `fetchFigmaNode`, but shaped as a full nodes-API
+ * response (`{ name, nodes: { [nodeId]: { document } } }`) — i.e. exactly
+ * the fixture format `verifyFromFixture` / `--fixture` expects. Lets a
+ * caller save one successful fetch to disk and keep comparing against it
+ * offline afterwards, which matters most for accounts on a rate-limit-
+ * constrained plan (see formatRateLimitError above): each save spends at
+ * most one of that budget, however many times it's reused locally.
+ * Shares fetchFigmaNode's cache, so calling this right after a compare
+ * that already fetched the same ref costs nothing extra.
+ */
+export async function fetchFigmaNodesResponse(
+  ref: FigmaRef,
+  token?: string,
+  opts?: { skipCache?: boolean }
+): Promise<FigmaNodesResponse> {
+  const document = await fetchFigmaNode(ref, token, opts);
+  return { name: document.name, nodes: { [ref.nodeId]: { document } } };
+}
