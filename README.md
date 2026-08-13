@@ -6,6 +6,8 @@
 
 ![Figma Verify report: fidelity score, side-by-side design vs implementation, layers tree, and agent fix instructions](docs/recruiter-report.png)
 
+The screenshot above is a real compare of the bundled Signup Card demo. The same tool has also been tested on the author's own personal projects for the [Columbia Daily Spectator](https://www.columbiaspectator.com/), including Spectator's Sources — not just the sample card.
+
 For a real compare on your machine, use **Link** mode on both inserters. File upload is still a work in progress.
 
 ### Recruiter try-it (two pasteable links)
@@ -17,14 +19,14 @@ npx playwright install chromium
 npm run studio
 ```
 
-Then open http://127.0.0.1:4174 and paste:
+Then open http://127.0.0.1:4174. Either click **Load demo**, or paste:
 
 | Inserter | Click | Paste |
 |---|---|---|
 | **Code folder** | **Link** | `http://127.0.0.1:4173/` |
-| **Figma mockup** | **Link** | `https://pookie2006.github.io/figma-verify/design-fixture.json` |
+| **Figma mockup** | **Link** | `http://127.0.0.1:4174/design-fixture.json` |
 
-`npm run studio` keeps the demo implementation on **port 4173** for as long as the studio is running (the bundled, deliberately flawed Signup Card). The Figma side is a **public fixture JSON** on GitHub Pages — same shape as a Figma nodes-API response, no `FIGMA_TOKEN` and no private Figma file required. Click **Compare**.
+`npm run studio` keeps the demo implementation on **port 4173** for as long as the studio is running (the bundled, deliberately flawed Signup Card). The Figma Link field accepts a **fixture JSON URL** — not only a `figma.com` file. The URL above is the bundled Signup Card fixture the studio already serves, same shape as a Figma nodes-API response. No `FIGMA_TOKEN` and no private Figma file required. Click **Compare**.
 
 A live `figma.com` proto/design URL still works in that same Link field if you have a token and the file is shared with that account.
 

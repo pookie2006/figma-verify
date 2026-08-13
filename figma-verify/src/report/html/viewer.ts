@@ -157,12 +157,15 @@ export const VIEWER_JS = `
   var codeInserter = document.getElementById('fv-code-inserter');
   var figmaInserter = document.getElementById('fv-figma-inserter');
   var compareBtn = document.getElementById('fv-compare');
+  var loadDemoBtn = document.getElementById('fv-load-demo');
   var pendingCodeFiles = [];
   var pendingLiveUrl = '';
   var pendingFixtureFile = null;
   var pendingFigmaUrl = '';
   var pendingPreviewOnly = false;
   var studioReady = null;
+  var demoCodeUrl = 'http://127.0.0.1:4173/';
+  var demoDesignUrl = 'http://127.0.0.1:4174/design-fixture.json';
   var FIGMA_URL_RE = /^https?:\\/\\/([a-z0-9-]+\\.)*figma\\.com\\//i;
   var HTTP_URL_RE = /^https?:\\/\\//i;
   var LIVE_URL_RE = /^(https?|file):\\/\\//i;
@@ -263,7 +266,7 @@ export const VIEWER_JS = `
     var isUrl = mode === 'url';
     figmaModeToggle.setAttribute('aria-pressed', isUrl ? 'true' : 'false');
     figmaModeToggle.textContent = isUrl ? 'File' : 'Link';
-    figmaModeToggle.title = isUrl ? 'Upload a fixture file instead' : 'Paste a Figma link instead of a file';
+    figmaModeToggle.title = isUrl ? 'Upload a fixture file instead' : 'Paste a Figma URL or a fixture JSON URL';
     figmaFileTrigger.hidden = isUrl;
     figmaUrlInput.hidden = !isUrl;
     if (isUrl) {
@@ -301,7 +304,7 @@ export const VIEWER_JS = `
       return;
     }
     if (!FIGMA_URL_RE.test(raw) && !HTTP_URL_RE.test(raw)) {
-      showToast('Paste a figma.com link, or a public fixture JSON URL');
+      showToast('Paste a figma.com link, or a public fixture JSON URL (http://127.0.0.1:4174/design-fixture.json)');
       return;
     }
     pendingFigmaUrl = raw;
@@ -309,9 +312,22 @@ export const VIEWER_JS = `
     figmaInserter.classList.add('has-file');
     syncFigmaSaveFixtureBtn();
     updateMeta(activeScore);
-    showToast('Figma link set \\u2014 ready to compare');
+    showToast(FIGMA_URL_RE.test(raw)
+      ? 'Figma link set \\u2014 ready to compare'
+      : 'Fixture JSON URL set \\u2014 ready to compare (no Figma token needed)');
     syncCompareBtn();
   }
+
+  function loadDemoLinks() {
+    setCodeMode('url');
+    setFigmaMode('url');
+    codeUrlInput.value = demoCodeUrl;
+    figmaUrlInput.value = demoDesignUrl;
+    commitCodeUrl();
+    commitFigmaUrl();
+    showToast('Demo links loaded \\u2014 click Compare (no Figma token needed)');
+  }
+  if (loadDemoBtn) loadDemoBtn.addEventListener('click', loadDemoLinks);
 
   figmaUrlInput.addEventListener('keydown', function (e) {
     if (e.key === 'Enter') { e.preventDefault(); commitFigmaUrl(); }
@@ -376,6 +392,8 @@ export const VIEWER_JS = `
       .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
       .then(function (j) {
         studioReady = !!(j && j.studio);
+        if (j && j.demo && j.demo.codeUrl) demoCodeUrl = j.demo.codeUrl;
+        if (j && j.demo && j.demo.designUrl) demoDesignUrl = j.demo.designUrl;
         // Answers "is the new token actually being used?" directly, without
         // trusting an env var export in some other terminal: the studio
         // resolves FIGMA_TOKEN to a real account via Figma's own /v1/me and
@@ -383,11 +401,11 @@ export const VIEWER_JS = `
         // it's there when you go looking, without an unprompted toast every load.
         var identity = j && j.figmaIdentity;
         if (identity && identity.status === 'ok') {
-          figmaInserter.title = 'Figma token in use: ' + identity.email + ' (@' + identity.handle + ')';
+          figmaInserter.title = 'Figma token in use: ' + identity.email + ' (@' + identity.handle + '). Fixture JSON URLs also work without the token.';
         } else if (identity && identity.status === 'invalid') {
-          figmaInserter.title = 'Figma token set but invalid/unverifiable: ' + (identity.detail || '');
+          figmaInserter.title = 'Figma token set but invalid/unverifiable: ' + (identity.detail || '') + '. Fixture JSON URLs still work \\u2014 try Load demo.';
         } else if (identity && identity.status === 'missing') {
-          figmaInserter.title = 'No FIGMA_TOKEN set on the studio \\u2014 restart it with the token exported first';
+          figmaInserter.title = 'No FIGMA_TOKEN \\u2014 fixture JSON URLs still work (Load demo or paste http://127.0.0.1:4174/design-fixture.json). A token is only needed for live figma.com links.';
         }
         return studioReady;
       })

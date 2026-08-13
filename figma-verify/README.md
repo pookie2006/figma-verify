@@ -27,7 +27,7 @@ Figma Verify closes the loop. The agent implements, verifies, reads the drift re
 ```
 
 ![Figma Verify report: fidelity score, side-by-side design vs implementation, layers tree, and agent fix instructions](../docs/recruiter-report.png)
-*Generated from the bundled Signup Card demo — every pixel of this UI is real output, not a mockup.*
+*Generated from the bundled Signup Card demo — every pixel of this UI is real output, not a mockup. The same compare has also been run on the author's own personal projects for the [Columbia Daily Spectator](https://www.columbiaspectator.com/), including Spectator's Sources.*
 
 <details>
 <summary>Mobile view (390px)</summary>
@@ -267,14 +267,14 @@ npm run studio                # report → http://127.0.0.1:4174
                               # demo implementation stays up on http://127.0.0.1:4173/
 ```
 
-**Recruiter / first-run pair (no Figma token needed):**
+**Recruiter / first-run pair (no Figma token needed):** click **Load demo**, or paste:
 
 | Inserter | Mode | Paste this |
 |---|---|---|
 | Code folder | **Link** | `http://127.0.0.1:4173/` |
-| Figma mockup | **Link** | `https://pookie2006.github.io/figma-verify/design-fixture.json` |
+| Figma mockup | **Link** | `http://127.0.0.1:4174/design-fixture.json` |
 
-The Code link is the bundled, deliberately flawed Signup Card. The studio keeps it listening on port 4173 until you stop the process. The Figma link is a **public** copy of that card’s nodes-API fixture on GitHub Pages — pasteable by anyone, no private Figma file and no `FIGMA_TOKEN`.
+The Code link is the bundled, deliberately flawed Signup Card. The studio keeps it listening on port 4173 until you stop the process. The Figma Link field accepts a **fixture JSON URL**, not only a `figma.com` file — `http://127.0.0.1:4174/design-fixture.json` is the same Signup Card fixture the studio already serves (`demo/design-fixture.json`). No private Figma file and no `FIGMA_TOKEN`.
 
 **Your own project (still prefer Link):**
 

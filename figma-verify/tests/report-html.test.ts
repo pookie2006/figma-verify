@@ -130,10 +130,12 @@ describe("renderHtmlReport", () => {
   it("lets the Figma inserter toggle to paste-a-link mode", () => {
     expect(html).toContain('id="fv-figma-url"');
     expect(html).toContain('id="fv-figma-mode-toggle"');
-    expect(html).toContain("Paste a Figma link");
+    expect(html).toContain("Paste a Figma URL or a fixture JSON URL");
     expect(html).toContain("figmaUrl");
     expect(html).toContain("File upload is a work in progress");
     expect(html).toContain("public fixture JSON URL");
+    expect(html).toContain('id="fv-load-demo"');
+    expect(html).toContain("http://127.0.0.1:4174/design-fixture.json");
   });
 
   it("filters heavy/irrelevant upload paths client-side before compare", () => {

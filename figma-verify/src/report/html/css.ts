@@ -51,6 +51,8 @@ h1.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-
 .inserter-mode-toggle { flex-shrink: 0; border: none; background: transparent; color: var(--muted); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; cursor: pointer; padding: 2px 5px; border-radius: 5px; }
 .inserter-mode-toggle:hover { background: rgba(0,0,0,0.06); color: var(--ink); }
 .inserter-mode-toggle[aria-pressed="true"] { color: var(--accent-dark); background: var(--accent-tint); }
+.demo-btn { flex-shrink: 0; border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight: 600; background: var(--chrome-2); color: var(--ink); cursor: pointer; }
+.demo-btn:hover { background: var(--accent-tint); border-color: var(--accent); color: var(--accent-dark); }
 .compare-btn { flex-shrink: 0; border: none; border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 700; letter-spacing: 0.01em; background: var(--accent); color: #fff; cursor: pointer; }
 .compare-btn:hover:not(:disabled) { background: var(--accent-dark); }
 .compare-btn:disabled { opacity: 0.45; cursor: not-allowed; }

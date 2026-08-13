@@ -10,12 +10,12 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { existsSync, createReadStream } from "node:fs";
 import type { AddressInfo } from "node:net";
-import type { FigmaNodesResponse } from "../src/figma/client.js";
 import { renderHtmlReport } from "../src/report/render-html.js";
 import { verifyFromFixture } from "../src/verify.js";
 import {
   isExcludedUploadPath,
   pickEntry,
+  resolveDesignSource,
   safeRelPath,
   stripSharedRoot,
   validateLiveUrl,
@@ -63,18 +63,20 @@ beforeAll(async () => {
         });
         const form = await request.formData();
         const figmaUrlField = form.get("figmaUrl");
-        if (typeof figmaUrlField === "string" && figmaUrlField) {
-          if (!/^https?:\/\/([a-z0-9-]+\.)*figma\.com\//i.test(figmaUrlField)) {
-            throw new Error(`Not a figma.com URL: ${figmaUrlField}`);
-          }
+        const fixtureFile = form.get("fixture");
+        const design = await resolveDesignSource({
+          figmaUrl: typeof figmaUrlField === "string" ? figmaUrlField : undefined,
+          fixtureName: fixtureFile instanceof File ? fixtureFile.name : undefined,
+          fixtureType: fixtureFile instanceof File ? fixtureFile.type : undefined,
+          fixtureText: fixtureFile instanceof File ? () => fixtureFile.text() : undefined,
+        });
+        if (design.kind === "figmaUrl") {
           // Real Figma API calls need FIGMA_TOKEN + network; not exercised here.
           res.writeHead(200, { "content-type": "application/json" });
-          res.end(JSON.stringify({ ok: true, acceptedFigmaUrl: figmaUrlField }));
+          res.end(JSON.stringify({ ok: true, acceptedFigmaUrl: design.figmaUrl }));
           return;
         }
-        const fixtureFile = form.get("fixture");
-        if (!(fixtureFile instanceof File)) throw new Error("missing fixture");
-        const fixture = JSON.parse(await fixtureFile.text()) as FigmaNodesResponse;
+        const fixture = design.fixture;
 
         const liveUrlField = form.get("liveUrl");
         if (typeof liveUrlField === "string" && liveUrlField.trim()) {
@@ -229,13 +231,30 @@ describe("studio /api/verify", () => {
     expect(body.report!.missing.map((m) => m.designName)).toContain("Guarantee Badge");
   }, 60_000);
 
-  it("rejects a non-figma.com URL as the design source", async () => {
+  it("compares against the bundled demo fixture JSON URL in the Figma Link field", async () => {
+    const fd = new FormData();
+    fd.append("figmaUrl", "http://127.0.0.1:4174/design-fixture.json");
+    fd.append("liveUrl", demoUrl);
+
+    const res = await fetch(`${baseUrl}/api/verify`, { method: "POST", body: fd });
+    const body = (await res.json()) as {
+      ok: boolean;
+      report?: { fidelityScore: number; missing: Array<{ designName: string }> };
+      error?: string;
+    };
+    expect(res.ok, body.error).toBe(true);
+    expect(body.ok).toBe(true);
+    expect(body.report!.fidelityScore).toBeLessThan(100);
+    expect(body.report!.missing.map((m) => m.designName)).toContain("Guarantee Badge");
+  }, 60_000);
+
+  it("rejects a non-figma.com URL that is not fixture JSON", async () => {
     const fd = new FormData();
     fd.append("figmaUrl", "https://evil.example.com/design/x?node-id=1-2");
     fd.append("files", new File([Buffer.from("<html></html>")], "index.html", { type: "text/html" }));
     const res = await fetch(`${baseUrl}/api/verify`, { method: "POST", body: fd });
     const body = (await res.json()) as { ok: boolean; error?: string };
     expect(res.ok).toBe(false);
-    expect(body.error).toMatch(/figma\.com/);
+    expect(body.error).toMatch(/fixture JSON|figma\.com|Could not fetch/i);
   });
 });
