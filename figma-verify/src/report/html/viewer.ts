@@ -30,7 +30,7 @@ export const VIEWER_JS = `
   var CHIP_DARK = { medium: true, high: true };
   var PROFILES = {
     balanced: { label: 'Balanced', desc: '100 minus flat weighted deductions (critical -15, high -5, medium -2, low -0.5). Default; comparable run-to-run.' },
-    strict: { label: 'Strict', desc: 'Balanced deductions, but any critical caps the score at 40 and any high at 75. Good as a CI release gate.' },
+    strict: { label: 'Strict', desc: 'Balanced deductions, but any critical caps the score at 40 and any high at 75, and it skips the resemblance floor other profiles get. Good as a CI release gate.' },
     perElement: { label: 'Per-element', desc: 'Each element scored 0-100 on its own diffs (missing = 0); final score is the mean. Robust to page size.' },
     rootCause: { label: 'Root cause', desc: 'Cascade diffs (caused by a parent\\u2019s drift) count at 25% weight, so one bad padding value reads as one problem.' }
   };
@@ -77,6 +77,7 @@ export const VIEWER_JS = `
       Object.keys(CAPS).forEach(function (sev) {
         if (items.some(function (it) { return it.diff.severity === sev; })) score = Math.min(score, CAPS[sev]);
       });
+      return round1(score); // strict is exempt from the resemblance floor — see SCORING_PROFILES.strict.
     }
     return Math.max(round1(score), SIMILARITY_FLOOR);
   }
@@ -960,11 +961,12 @@ export const VIEWER_JS = `
     if (!SIMILARITY_FLOOR || score !== SIMILARITY_FLOOR) return '';
     var sim = report.similarity || {};
     var parts = [];
-    if (sim.colorOverlap !== null && sim.colorOverlap !== undefined) parts.push('colors ' + Math.round(sim.colorOverlap * 100) + '%');
-    if (sim.fontOverlap !== null && sim.fontOverlap !== undefined) parts.push('fonts ' + Math.round(sim.fontOverlap * 100) + '%');
-    if (sim.textOverlap !== null && sim.textOverlap !== undefined) parts.push('text ' + Math.round(sim.textOverlap * 100) + '%');
-    return '<div class="bd-note">Raised to the ' + SIMILARITY_FLOOR + '/100 similarity floor \\u2014 shared ' +
-      (parts.length ? parts.join(', ') : 'visual language') + ' with the design, even where elements didn\\u2019t structurally match.</div>';
+    if (sim.structuralCoverage !== null && sim.structuralCoverage !== undefined) parts.push(Math.round(sim.structuralCoverage * 100) + '% of elements matched something');
+    if (sim.textOverlap !== null && sim.textOverlap !== undefined) parts.push('text ' + Math.round(sim.textOverlap * 100) + '% similar');
+    if (sim.colorOverlap !== null && sim.colorOverlap !== undefined) parts.push('colors ' + Math.round(sim.colorOverlap * 100) + '% shared');
+    if (sim.fontOverlap !== null && sim.fontOverlap !== undefined) parts.push('fonts ' + Math.round(sim.fontOverlap * 100) + '% shared');
+    return '<div class="bd-note">Raised to the ' + SIMILARITY_FLOOR + '/100 resemblance floor \\u2014 ' +
+      (parts.length ? parts.join(', ') : 'shares real visual language with the design') + ', even where deductions alone would say 0. Not shown for Strict.</div>';
   }
   renderScore();
 

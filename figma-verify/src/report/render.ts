@@ -39,7 +39,7 @@ export function renderMarkdown(report: DriftReport): string {
   );
   if (report.similarity.floor > 0) {
     lines.push(
-      `_Score floor: ${report.similarity.floor}/100 from shared colors/fonts/text with the design, even where elements didn't structurally match._  `
+      `_Resemblance floor: ${report.similarity.floor}/100 (applies to all profiles except Strict), from shared structure/colors/fonts/text with the design that the deduction-based score alone doesn't credit._  `
     );
   }
   lines.push("");

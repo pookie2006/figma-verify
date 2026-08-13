@@ -15,6 +15,16 @@ import type { NormalizedElement } from "../types.js";
  * counted as a mismatch.
  */
 export interface SimilaritySignals {
+  /**
+   * Fraction of design elements that found ANY DOM counterpart, via any
+   * matching method, regardless of how much that counterpart's styling
+   * drifted. This is the strongest evidence that "the same page exists,
+   * just imperfectly built" rather than "an unrelated page": a design with
+   * dozens of elements where most of them lined up with *something* in the
+   * DOM is clearly related, even if every one of those matches also has
+   * color/spacing/typography diffs piling up elsewhere in the score.
+   */
+  structuralCoverage: number | null;
   /** Fraction of distinct design colors that appear (within a loose distance) somewhere in the implementation. */
   colorOverlap: number | null;
   /** Fraction of distinct design font families that appear anywhere in the implementation. */
@@ -30,14 +40,28 @@ export interface SimilaritySignals {
  */
 const SIMILARITY_COLOR_DISTANCE = 60;
 
-/** Upper bound on how much this signal alone can lift a score — real fidelity still has to come from structural matches. */
-export const SIMILARITY_FLOOR_CAP = 35;
+/**
+ * Upper bound on how much this signal alone can lift a score. Deliberately
+ * well short of a passing grade — a page that clearly shares real DOM
+ * structure, colors, fonts, and copy with the design still isn't a
+ * faithful implementation just because it's recognizably related, but it
+ * also isn't "literally nothing in common," which a flat 0 implies.
+ */
+export const SIMILARITY_FLOOR_CAP = 55;
 
-/** Relative weight of each signal in the blend: shared copy is the strongest evidence two pages are related; shared palette is common (brand resets, CSS frameworks); matching fonts are common (system font stacks) and weakest evidence alone. */
+/**
+ * Relative weight of each signal in the blend. Structural coverage is
+ * weighted highest: an element actually being found (however imperfectly
+ * styled) is stronger, more specific evidence of relatedness than a shared
+ * color or font, which can occur between totally unrelated pages just from
+ * common frameworks/system fonts. Shared copy is the next-strongest signal
+ * since it's unlikely by chance; palette and font alone are the weakest.
+ */
 const SIGNAL_WEIGHTS: Record<keyof SimilaritySignals, number> = {
-  colorOverlap: 0.25,
-  fontOverlap: 0.15,
-  textOverlap: 0.6,
+  structuralCoverage: 0.4,
+  textOverlap: 0.35,
+  colorOverlap: 0.15,
+  fontOverlap: 0.1,
 };
 
 function collectColors(elements: NormalizedElement[]): string[] {
@@ -121,12 +145,20 @@ function textOverlapRatio(design: NormalizedElement[], dom: NormalizedElement[])
   return total / designTexts.length;
 }
 
-/** Compute the raw resemblance signals between a full design tree and a full DOM tree. */
+/**
+ * Compute the resemblance signals between a full design tree and a full
+ * DOM tree. `structuralCoverage` comes from the matcher/diff stage (the
+ * fraction of scored design elements that found any DOM counterpart) since
+ * this module has no visibility into matching on its own; pass `null` when
+ * there are no scored elements at all.
+ */
 export function computeSimilaritySignals(
   design: NormalizedElement[],
-  dom: NormalizedElement[]
+  dom: NormalizedElement[],
+  structuralCoverage: number | null
 ): SimilaritySignals {
   return {
+    structuralCoverage,
     colorOverlap: colorOverlapRatio(design, dom),
     fontOverlap: fontOverlapRatio(design, dom),
     textOverlap: textOverlapRatio(design, dom),

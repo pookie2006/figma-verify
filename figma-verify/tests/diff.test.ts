@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { diffPair, diffMatches, rgbDistance } from "../src/diff/diff.js";
+import { SIMILARITY_FLOOR_CAP } from "../src/diff/similarity.js";
 import { DEFAULT_TOLERANCES } from "../src/config.js";
 import type { MatchResult, NormalizedElement } from "../src/types.js";
 
@@ -207,10 +208,51 @@ describe("diffMatches: similarity floor", () => {
     expect(report.missing).toHaveLength(8);
     // ...but the score is no longer a flat 0, because of the shared palette/font/copy.
     expect(report.similarity.floor).toBeGreaterThan(0);
-    expect(report.similarity.floor).toBeLessThan(35);
+    expect(report.similarity.floor).toBeLessThan(SIMILARITY_FLOOR_CAP);
     expect(report.fidelityScore).toBe(report.similarity.floor);
     expect(report.scores.perElement).toBe(report.similarity.floor);
-    expect(report.scores.strict).toBe(report.similarity.floor);
+    // Strict is deliberately exempt from the resemblance floor (it's meant
+    // to be an uncompromising CI gate), so it stays at the raw, capped 0.
+    expect(report.scores.strict).toBe(0);
+  });
+
+  it("gives a mostly-matched-but-heavily-drifted page a meaningful floor instead of 0", () => {
+    // Simulates the real-world case that motivated this: a large page where
+    // MOST elements found a DOM counterpart (so this is clearly "the same
+    // page, badly styled"), but each matched pair also differs on several
+    // properties and a few elements are outright missing — enough that the
+    // flat deduction sum alone blows well past 100.
+    const design = Array.from({ length: 10 }, (_, i) =>
+      el({
+        id: `d${i}`,
+        name: `El ${i}`,
+        role: i < 7 ? "text" : "container",
+        text: i < 7 ? `Label ${i}` : undefined,
+        styles: i < 7 ? { backgroundColor: "#4f46e5", fontFamily: "Inter" } : {},
+      })
+    );
+    const dom = design.slice(0, 7).map((d, i) =>
+      el({
+        id: `w${i}`,
+        name: d.name,
+        role: "text",
+        text: `Something else ${i}`,
+        styles: { backgroundColor: "#000000", fontFamily: "Georgia" },
+      })
+    );
+    const matches: MatchResult[] = design.map((d, i) =>
+      i < 7
+        ? { designId: d.id, domId: `w${i}`, method: "geometry" as const }
+        : { designId: d.id, method: "unmatched" as const }
+    );
+    const report = diffMatches(design, dom, matches, tol, { frameName: "F", viewportWidth: 800 });
+
+    expect(report.missing).toHaveLength(3);
+    expect(report.similarity.structuralCoverage).toBeCloseTo(0.7, 5);
+    // Structural coverage (mostly matched) is enough to lift the floor well
+    // above 0 even though the palette/fonts/copy barely overlap.
+    expect(report.similarity.floor).toBeGreaterThan(10);
+    expect(report.fidelityScore).toBe(report.similarity.floor);
   });
 
   it("never lets the similarity floor override a genuinely good structural score", () => {

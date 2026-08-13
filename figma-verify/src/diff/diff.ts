@@ -88,10 +88,17 @@ export function diffMatches(
   tagCascades(designById, elements);
 
   const scores = computeScores(elements);
-  const similaritySignals = computeSimilaritySignals(design, dom);
+  const structuralCoverage = elements.length
+    ? elements.filter((e) => e.matched).length / elements.length
+    : null;
+  const similaritySignals = computeSimilaritySignals(design, dom, structuralCoverage);
   const floor = similarityFloor(similaritySignals);
   if (floor > 0) {
+    // Every profile except strict gets the floor: strict is documented as
+    // an uncompromising CI release gate ("missing elements can never
+    // average out"), so it deliberately stays exempt.
     for (const key of Object.keys(scores) as ScoringProfile[]) {
+      if (key === "strict") continue;
       scores[key] = Math.max(scores[key], floor);
     }
   }

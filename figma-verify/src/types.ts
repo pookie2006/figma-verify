@@ -141,10 +141,12 @@ export interface DriftReport {
    * identically to one that shares nothing at all. See diff/similarity.ts.
    */
   similarity: {
+    /** Fraction of scored elements that found any DOM counterpart, however imperfectly styled. */
+    structuralCoverage: number | null;
     colorOverlap: number | null;
     fontOverlap: number | null;
     textOverlap: number | null;
-    /** The floor actually applied: max(0, min(SIMILARITY_FLOOR_CAP, blended signals)). */
+    /** The floor actually applied (0..SIMILARITY_FLOOR_CAP); not applied to the strict profile. */
     floor: number;
   };
   /** Design elements with no acceptable DOM counterpart. */

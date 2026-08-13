@@ -65,6 +65,7 @@ Figma Verify closes the loop. The agent implements, verifies, reads the drift re
                        ▼
               ┌──────────────────┐
               │ scoring.ts       │  4 scoring profiles, fidelity 0–100
+              │ similarity.ts    │  resemblance floor (colors/fonts/text/coverage)
               └────────┬─────────┘
                        ▼
          ┌─────────────┴─────────────┐
@@ -110,7 +111,24 @@ Every run computes the score under four profiles; **balanced** is the standardiz
 | `perElement` | each element scored 0–100 on its own diffs (missing = 0); final = mean | Large pages, where one broken element shouldn't tank the score |
 | `rootCause` | balanced, but cascade diffs count at 25% weight | Triage — see how many *distinct* problems there really are |
 
-**Cascades:** when a parent's padding/gap/size drifts, every child shifts with it. Those child position diffs are tagged `cascade` in the report and discounted by the `rootCause` profile — in the demo, one wrong padding value produces 15 derived diffs; balanced scores it 18/100 while rootCause scores 40.5/100, telling you it's really ~5 problems, not 25.
+**Cascades:** when a parent's padding/gap/size drifts, every child shifts with it. Those child position diffs are tagged `cascade` in the report and discounted by the `rootCause` profile — in the demo, one wrong padding value produces 15 derived diffs; balanced's raw deduction total is 18/100 while rootCause's discounted total is 40.5/100, telling you it's really ~5 problems, not 25. (Both actually report 44.9 in the demo report, once the resemblance floor below kicks in — this build is otherwise a close, mostly-faithful match.)
+
+### Resemblance floor
+
+The deduction formulas above are page-total sums with no upper bound: a big page with dozens of scored elements can rack up more total deductions than a tiny page with the exact same *proportion* of things wrong, purely from having more elements to deduct from. Taken to the extreme — a completely different layout, so nothing matches structurally — every profile floors at a flat, uninformative **0**, even when the implementation clearly shares real DNA with the design: same brand colors, same fonts, very similar copy, or (short of an exact structural match) most elements finding *some* plausible counterpart.
+
+To fix that, every score except `strict` is passed through `Math.max(score, floor)`, where `floor` is a 0–55 blend of four page-level resemblance signals (`src/diff/similarity.ts`):
+
+| Signal | What it measures | Weight |
+|---|---|---|
+| `structuralCoverage` | Fraction of design elements that found *any* DOM counterpart (any matching method), regardless of how much that counterpart's styling drifted | 0.40 |
+| `textOverlap` | Average best-match word overlap between each piece of design copy and the closest implementation copy | 0.35 |
+| `colorOverlap` | Fraction of distinct design colors that appear (within a loose ΔRGB, looser than the per-property diff tolerance) somewhere in the implementation | 0.15 |
+| `fontOverlap` | Fraction of distinct design font families used anywhere in the implementation | 0.10 |
+
+Signals the design has no data for (e.g. a frame with no text at all) are excluded from the blend rather than counted as 0. The floor is capped well below a passing grade (55, vs. 60+ for a "D"), so a page that's clearly related to the design still reads as a low/failing score — it just isn't indistinguishable from a page that shares *nothing* with it. `strict` stays exempt on purpose: it's meant to be an uncompromising CI release gate where a missing element should never be softened by "well, it's the same general vibe."
+
+The HTML report's score breakdown shows a "Raised to the N/100 resemblance floor" note (and the markdown report a `_Resemblance floor: N/100_` line) whenever this is the reason a profile's score is higher than its raw deduction total.
 
 ### Visual HTML report
 
