@@ -375,6 +375,19 @@ export const VIEWER_JS = `
       .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
       .then(function (j) {
         studioReady = !!(j && j.studio);
+        // Answers "is the new token actually being used?" directly, without
+        // trusting an env var export in some other terminal: the studio
+        // resolves FIGMA_TOKEN to a real account via Figma's own /v1/me and
+        // reports it here. Shown as a hover tooltip on the Figma inserter so
+        // it's there when you go looking, without an unprompted toast every load.
+        var identity = j && j.figmaIdentity;
+        if (identity && identity.status === 'ok') {
+          figmaInserter.title = 'Figma token in use: ' + identity.email + ' (@' + identity.handle + ')';
+        } else if (identity && identity.status === 'invalid') {
+          figmaInserter.title = 'Figma token set but invalid/unverifiable: ' + (identity.detail || '');
+        } else if (identity && identity.status === 'missing') {
+          figmaInserter.title = 'No FIGMA_TOKEN set on the studio \\u2014 restart it with the token exported first';
+        }
         return studioReady;
       })
       .catch(function () {
