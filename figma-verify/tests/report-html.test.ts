@@ -132,6 +132,7 @@ describe("renderHtmlReport", () => {
     expect(html).toContain('id="fv-figma-mode-toggle"');
     expect(html).toContain("Paste a Figma link");
     expect(html).toContain("figmaUrl");
+    expect(html).toContain("File upload is a work in progress");
   });
 
   it("filters heavy/irrelevant upload paths client-side before compare", () => {

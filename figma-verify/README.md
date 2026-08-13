@@ -234,49 +234,44 @@ Exit code 0 = fidelity 100, 1 = drift found, 2 = error.
 
 Run the CLI as above and watch the report catch all five. Point an agent at the report and it fixes the page; re-run until the score is 100.
 
-## Deployment
+## Deployment (GitHub Pages)
 
-**Live demo:** [pookie2006.github.io/figma-verify](https://pookie2006.github.io/figma-verify/)
+**Live site:** [pookie2006.github.io/figma-verify](https://pookie2006.github.io/figma-verify/)
 
-There are two ways the site gets published (pick either):
+The report UI is a static GitHub Pages site. The published files live in [`docs/`](../docs/) at the repo root (`index.html` is the report — there is no intro landing page). GitHub Pages is set to **Deploy from a branch** → `main` → `/docs`, so every merge to `main` that updates `docs/` goes live at that URL.
 
-### Option A — GitHub Actions (preferred)
-
-Every push to `main` that touches `figma-verify/` regenerates the demo report and publishes it via [`.github/workflows/deploy-pages.yml`](../.github/workflows/deploy-pages.yml).
-
-**One-time enable (required — the first Actions deploy will 404 until this is done):**
-
-1. Open [Settings → Pages](https://github.com/pookie2006/figma-verify/settings/pages)
-2. Under **Build and deployment → Source**, choose **GitHub Actions**
-3. Re-run the failed workflow: [Actions → Deploy demo to GitHub Pages](https://github.com/pookie2006/figma-verify/actions/workflows/deploy-pages.yml) → *Re-run jobs*
-
-### Option B — Deploy from the committed `docs/` folder
-
-A pre-built copy of the demo site is checked into [`docs/`](../docs/) at the repo root. On [Settings → Pages](https://github.com/pookie2006/figma-verify/settings/pages), set Source to **Deploy from a branch**, Branch to `main`, Folder to `/docs`, then Save. The same URL goes live within a minute — no Actions needed.
-
-The published site opens straight into the interactive report (`index.html` / `report.html`). Supporting pages:
-
-- `demo-implementation.html` — the flawed page it's scoring
-- `design-reference.html` — a pixel-faithful reference build
-
-### Live compare from the report UI
-
-The GitHub Pages demo is static (it can’t run Playwright). For a real upload-driven compare:
+To refresh the deployed site after report UI changes:
 
 ```bash
 cd figma-verify
-npm run studio          # http://127.0.0.1:4174
+npm run demo:report
+cp demo/report.html ../docs/report.html
+cp demo/report.html ../docs/index.html
+# commit and merge to main — Pages rebuilds from /docs
 ```
 
-1. **Code folder** — either:
-   - Click **Link** and paste a **running dev server URL** (e.g. `http://localhost:3000/search-page`) — no upload at all, Playwright just navigates there directly. This is the simplest option if your app is already running (`npm start`), and sidesteps upload-size/permission issues entirely, or
-   - Click **File** and select the folder that contains your **built/static** implementation (`index.html` plus CSS/JS assets — e.g. a React/Vite app's `build/` or `dist/` output after `npm run build`, not the raw `src/`). `node_modules`, `.git`, and similar are excluded automatically; uploads are capped at 80MB / 4000 files so a whole project can't crash the studio server.
-2. **Figma mockup** — either:
-   - Click **Link** and paste a Figma URL — `design`, `file`, `proto`, or `board`, e.g. `https://www.figma.com/proto/KEY/name?node-id=1601-3`. Needs `FIGMA_TOKEN` set before starting the studio (`export FIGMA_TOKEN=...`, from [figma.com/settings](https://www.figma.com/settings) → Personal access tokens), or
-   - Click **File** and upload a **nodes-API fixture JSON** (same shape as `demo/design-fixture.json`) — works offline, no token needed.
+Supporting pages on the same site:
 
-   Images are preview-only and cannot drive the structural score.
-3. Click **Compare** — the studio serves the folder, fetches/normalizes the design (from the link or fixture), extracts the live DOM, diffs the two, and reloads the report with the new score / fix instructions.
+- `demo-implementation.html` — the flawed page the report is scoring
+- `design-reference.html` — a pixel-faithful reference build
+
+There is also an Actions workflow ([`.github/workflows/deploy-pages.yml`](../.github/workflows/deploy-pages.yml)) that regenerates the report on push to `main`. The live source of truth for the URL above is still the committed `docs/` folder (Settings → Pages → Deploy from a branch → `/docs`). If you switch Source to **GitHub Actions**, that workflow becomes the publisher instead.
+
+### Live compare from the report UI
+
+The GitHub Pages demo is static (it can’t run Playwright). For a real compare, run the local studio and use **links on both sides** — that is the supported path. File upload is still a work in progress (folder uploads in particular are flaky: size limits, `node_modules`, and macOS permissions).
+
+```bash
+cd figma-verify
+export FIGMA_TOKEN=figd_...   # same terminal
+npm run studio                # http://127.0.0.1:4174
+```
+
+1. **Code (use Link)** — click **Link** on the Code folder inserter and paste a **running dev server URL** (e.g. `http://localhost:3000/search-page`). Playwright navigates there directly. This is the reliable option if your app is already running (`npm start`).
+2. **Figma (use Link)** — click **Link** on the Figma mockup inserter and paste a Figma URL (`design`, `file`, `proto`, or `board`), e.g. `https://www.figma.com/proto/KEY/name?node-id=1601-3`. Needs `FIGMA_TOKEN` set before starting the studio (from [figma.com/settings](https://www.figma.com/settings) → Personal access tokens).
+3. Click **Compare** — the studio fetches the design, extracts the live DOM, diffs the two, and reloads the report.
+
+**File upload is a work in progress.** The File toggles are still there (code folder = built `build/` or `dist/` output; Figma = a nodes-API fixture JSON like `demo/design-fixture.json`), but prefer links. Images are preview-only and cannot drive the structural score. If you already have a saved fixture JSON from **Save fixture**, File mode on the Figma side is the one upload path that is solid (offline, no token, no rate limit).
 
 CLI/MCP remain the headless path (`--fixture` + live URL, or a Figma URL + `FIGMA_TOKEN`).
 

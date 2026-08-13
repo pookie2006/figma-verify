@@ -2,9 +2,9 @@
 
 **An MCP server that lets AI agents check their code against the Figma design — and self-correct until it's pixel-perfect.**
 
-**🔗 Live demo:** [pookie2006.github.io/figma-verify](https://pookie2006.github.io/figma-verify/) — the interactive drift report, the flawed implementation it's scoring, and a pixel-faithful reference build.
+**🔗 Live site (GitHub Pages):** [pookie2006.github.io/figma-verify](https://pookie2006.github.io/figma-verify/) — the interactive report, deployed from the [`docs/`](docs/) folder on `main`.
 
-> First-time setup: open [Settings → Pages](https://github.com/pookie2006/figma-verify/settings/pages) and either set Source to **GitHub Actions**, *or* set Source to **Deploy from a branch** → `main` → `/docs`. Until that toggle is flipped once, the `github.io` URL returns 404.
+For a real compare on your machine, use **Link** mode on both inserters (a running `localhost` URL + a Figma proto/design link). File upload is still a work in progress — see [`figma-verify/README.md`](figma-verify/README.md#live-compare-from-the-report-ui).
 
 Figma's MCP server pushes design context *into* agents, and agents generate code from it. But nothing closes the loop: no tool lets the agent **verify** that the implementation actually matches the design. Figma Verify closes that loop — the agent implements, verifies, reads the drift report, fixes its code, and re-runs until the fidelity score is 100.
 
@@ -45,6 +45,8 @@ npx playwright install chromium
 export FIGMA_TOKEN=figd_...   # same terminal you start the studio from
 npm run studio                # http://127.0.0.1:4174
 ```
+
+Then in the report toolbar, click **Link** on both inserters: paste your running app URL (e.g. `http://localhost:3000/search-page`) and your Figma link. Prefer links — file upload is still a work in progress.
 
 `npm run studio` from the **repo root** also works (it forwards into the inner package), as long as you have pulled a revision that includes that script. If you see `Missing script: "studio"`, this checkout is older than the studio server — `git pull origin main` and try again. Do not run it from a leftover copy under Downloads that was never updated.
 

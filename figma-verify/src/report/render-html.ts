@@ -51,7 +51,7 @@ export function renderHtmlReport(input: HtmlReportInput): string {
     <span>Figma Verify</span>
   </h1>
   <div class="inserters" role="group" aria-label="Source inputs">
-    <div class="inserter" id="fv-code-inserter" title="Select a built/static implementation folder, or paste a running dev server URL">
+    <div class="inserter" id="fv-code-inserter" title="Prefer Link: paste a running dev server URL. File upload is a work in progress.">
       <label class="inserter-trigger" id="fv-code-file-trigger">
         <input type="file" id="fv-code-input" webkitdirectory multiple hidden />
         <svg class="inserter-ic" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5h5l1.5 1.5H14.5v8H1.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
@@ -61,7 +61,7 @@ export function renderHtmlReport(input: HtmlReportInput): string {
       <input type="text" id="fv-code-url" class="inserter-url-input" placeholder="Paste a live URL (http://localhost:3000/...)" hidden aria-label="Live implementation URL" />
       <button type="button" id="fv-code-mode-toggle" class="inserter-mode-toggle" aria-pressed="false" title="Paste a live URL instead of uploading a folder">Link</button>
     </div>
-    <div class="inserter" id="fv-figma-inserter" title="Paste a Figma link (design/file/proto), or upload a nodes-API fixture JSON">
+    <div class="inserter" id="fv-figma-inserter" title="Prefer Link: paste a Figma design/file/proto URL. File upload is a work in progress (fixture JSON still works for offline compares).">
       <label class="inserter-trigger" id="fv-figma-file-trigger">
         <input type="file" id="fv-figma-input" accept=".json,application/json,.png,.jpg,.jpeg,.webp,.svg,image/*" hidden />
         <svg class="inserter-ic" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 9l2-2.5 2 1.5L11 5.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
