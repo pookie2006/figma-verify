@@ -34,12 +34,19 @@ All code lives in [`figma-verify/`](figma-verify/):
 
 ## Quickstart
 
+The GitHub repo and the npm package are both named `figma-verify`, so after a clone you are in the **repo root** (this folder). The runnable package — including `npm run studio` — is one level down:
+
 ```bash
-cd figma-verify
+# from the clone root (pookie2006/figma-verify)
+git pull origin main          # needed if this checkout predates the studio server
+cd figma-verify               # the inner package, the one with src/studio/server.ts
 npm install
 npx playwright install chromium
-npm test
+export FIGMA_TOKEN=figd_...   # same terminal you start the studio from
+npm run studio                # http://127.0.0.1:4174
 ```
+
+`npm run studio` from the **repo root** also works (it forwards into the inner package), as long as you have pulled a revision that includes that script. If you see `Missing script: "studio"`, this checkout is older than the studio server — `git pull origin main` and try again. Do not run it from a leftover copy under Downloads that was never updated.
 
 See the full documentation in [`figma-verify/README.md`](figma-verify/README.md) for MCP registration (Cursor, Claude Code, VS Code), the `verify_implementation` and `get_design_spec` tools, CLI usage, tolerances, and the severity model.
 

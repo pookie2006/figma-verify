@@ -110,9 +110,38 @@ describe("fetchFigmaNode", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(fetchFigmaNode(ref, "tok")).rejects.toThrow(/won't help/i);
+    await expect(fetchFigmaNode(ref, "tok")).rejects.toThrow(/same account/i);
     await expect(fetchFigmaNode(ref, "tok")).rejects.toThrow(/starter/i);
     await expect(fetchFigmaNode(ref, "tok")).rejects.toThrow(/figma\.com\/upgrade/i);
+  });
+
+  it("does not retry blindly when Figma sends no Retry-After hint, to avoid burning a scarce monthly quota", async () => {
+    // No retry-after header at all (as opposed to "0") — some plan/seat
+    // combinations cap at 6 requests/MONTH, where guessing a backoff and
+    // retrying a few times just spends 4x the budget on one failed click.
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(429, { err: "rate limited" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchFigmaNode(ref, "tok")).rejects.toThrow(/rate limit exceeded/i);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    clearFigmaNodeCache();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(429, { err: "rate limited" })));
+    await expect(fetchFigmaNode(ref, "tok")).rejects.toThrow(/didn't send a retry-after hint/i);
+  });
+
+  it("stops retrying as soon as a retry succeeds, without extra requests", async () => {
+    const node: FigmaNode = { id: "1:2", name: "Frame", type: "FRAME" };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(429, { err: "rate limited" }, { "retry-after": "0" }))
+      .mockResolvedValueOnce(jsonResponse(429, { err: "rate limited" }, { "retry-after": "0" }))
+      .mockResolvedValueOnce(jsonResponse(200, nodesResponse(node)));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchFigmaNode(ref, "tok");
+    expect(result).toEqual(node);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("does not cache a failed (429) fetch", async () => {

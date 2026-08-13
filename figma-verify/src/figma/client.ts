@@ -57,10 +57,15 @@ export interface FigmaNodesResponse {
 const FIGMA_API_BASE = "https://api.figma.com";
 
 /**
- * How many times to retry a 429 before giving up. Figma's REST API rate
- * limit is a short sliding window (docs: figma.com/developers/api#rate-limits),
- * so a couple of short waits usually clear it — this is not meant to paper
- * over sustained abuse, just the "clicked Compare twice in a row" case.
+ * How many times to retry a 429 before giving up, and ONLY when Figma's
+ * response includes a `Retry-After` header. That header is the only signal
+ * that distinguishes a short per-minute throttle (worth a couple of brief
+ * waits) from an exhausted quota that resets monthly — some plan/seat
+ * combinations are capped as low as 6 requests/**month** for this
+ * endpoint, and retrying blindly there doesn't recover anything, it just
+ * burns 1 + MAX_RATE_LIMIT_RETRIES of that scarce monthly budget on a
+ * single failed attempt. Without a Retry-After header, we fail fast
+ * instead of guessing.
  */
 const MAX_RATE_LIMIT_RETRIES = 3;
 
@@ -101,42 +106,50 @@ export function clearFigmaNodeCache(): void {
  *    your own seat: a file living in a free "Starter" plan is capped as low
  *    as 6 requests/month for this endpoint, even from an Enterprise seat.
  */
-function formatRateLimitError(res: Response): string {
+function formatRateLimitError(res: Response, attempts: number): string {
   const retryAfter = res.headers.get("retry-after");
   const planTier = res.headers.get("x-figma-plan-tier");
   const limitType = res.headers.get("x-figma-rate-limit-type");
   const upgradeLink = res.headers.get("x-figma-upgrade-link");
 
   const lines = [
-    `Figma API rate limit exceeded (429) after retrying ${MAX_RATE_LIMIT_RETRIES} times.`,
+    `Figma API rate limit exceeded (429)${attempts > 1 ? ` after ${attempts} attempts` : ""}.`,
     planTier || limitType
       ? `Figma reports: plan tier "${planTier ?? "unknown"}", limit type "${limitType ?? "unknown"}".`
       : undefined,
-    "A new personal access token won't help — Figma tracks personal-access-token limits per Figma *account* " +
-      "(whoever generated the token), not per token string, so a second token draws from the same budget.",
-    "This is also governed by the plan of the Figma FILE you're fetching, not just your own seat: files on a " +
-      "free/Starter plan are capped as low as 6 requests/month for this endpoint regardless of your seat elsewhere.",
-    `Wait ${retryAfter ? `about ${retryAfter}s` : "a minute or two (longer if the file is on a Starter plan)"} and try again — the design ` +
-      `is now cached for ${Math.round(CACHE_TTL_MS / 60_000)} minutes per run, so re-comparing the same Figma link ` +
-      "while you fix the implementation won't re-hit the API.",
+    !retryAfter
+      ? "Figma didn't send a Retry-After hint, which usually means this isn't a short throttle you can wait out — " +
+        "it's more likely a quota that resets monthly (some plan/seat combinations are capped as low as 6 requests/month " +
+        "for this endpoint). We didn't retry blindly, to avoid burning more of that budget on this one failed attempt."
+      : undefined,
+    "A new personal access token from a DIFFERENT Figma account does get a separate budget (limits are tracked per " +
+      "account, not per token string) — but only if that account has a Dev/Full seat on a paid plan; a second " +
+      "View/Collab account is capped the same way. A second token from the SAME account never helps.",
+    `Wait ${retryAfter ? `about ${retryAfter}s` : "and check again later (could be until next month, if this is a monthly quota)"} and try again — the design ` +
+      `is cached for ${Math.round(CACHE_TTL_MS / 60_000)} minutes per run, so re-comparing the same Figma link while ` +
+      "you fix the implementation won't re-hit the API. Better yet, use \"Save fixture\" the next time a compare " +
+      "succeeds so you never need another live fetch for this design.",
     upgradeLink ? `Figma suggests: ${upgradeLink}` : undefined,
   ];
   return lines.filter(Boolean).join(" ");
 }
 
-async function fetchWithRateLimitRetry(url: string, authToken: string): Promise<Response> {
-  for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt++) {
+async function fetchWithRateLimitRetry(url: string, authToken: string): Promise<{ res: Response; attempts: number }> {
+  for (let attempt = 1; attempt <= MAX_RATE_LIMIT_RETRIES + 1; attempt++) {
     const res = await fetch(url, { headers: { "X-Figma-Token": authToken } });
-    if (res.status !== 429) return res;
+    if (res.status !== 429) return { res, attempts: attempt };
+    if (attempt > MAX_RATE_LIMIT_RETRIES) return { res, attempts: attempt }; // give up; let the caller turn this into the final error
 
-    if (attempt === MAX_RATE_LIMIT_RETRIES) return res; // let the caller turn this into the final error
-
+    // Only retry when Figma explicitly tells us how long to wait. See the
+    // MAX_RATE_LIMIT_RETRIES comment above for why we don't guess otherwise.
     const retryAfterHeader = res.headers.get("retry-after");
-    const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : NaN;
-    const backoffMs = Number.isFinite(retryAfterMs) && retryAfterMs >= 0 ? retryAfterMs : 2 ** attempt * 1000;
-    await sleep(Math.min(backoffMs, MAX_BACKOFF_MS));
+    if (!retryAfterHeader) return { res, attempts: attempt };
+    const retryAfterMs = Number(retryAfterHeader) * 1000;
+    if (!Number.isFinite(retryAfterMs) || retryAfterMs < 0) return { res, attempts: attempt };
+
+    await sleep(Math.min(retryAfterMs, MAX_BACKOFF_MS));
   }
-  throw new Error("unreachable"); // loop always returns or throws above
+  throw new Error("unreachable"); // loop always returns above
 }
 
 /**
@@ -156,10 +169,10 @@ export async function fetchFigmaNode(
   const authToken = token ?? getFigmaToken();
   const url = `${FIGMA_API_BASE}/v1/files/${ref.fileKey}/nodes?ids=${encodeURIComponent(ref.nodeId)}&geometry=paths`;
 
-  const res = await fetchWithRateLimitRetry(url, authToken);
+  const { res, attempts } = await fetchWithRateLimitRetry(url, authToken);
 
   if (res.status === 429) {
-    throw new Error(formatRateLimitError(res));
+    throw new Error(formatRateLimitError(res, attempts));
   }
   if (res.status === 403) {
     throw new Error("Figma API returned 403. Check that FIGMA_TOKEN is valid and has access to this file.");
@@ -200,4 +213,30 @@ export async function fetchFigmaNodesResponse(
 ): Promise<FigmaNodesResponse> {
   const document = await fetchFigmaNode(ref, token, opts);
   return { name: document.name, nodes: { [ref.nodeId]: { document } } };
+}
+
+export interface FigmaIdentity {
+  email: string;
+  handle: string;
+}
+
+/**
+ * Resolve which Figma account a token actually belongs to, via Figma's
+ * `GET /v1/me` (a separate, much higher-volume "Tier 3" endpoint — this
+ * doesn't touch the file-fetching budget at all). This is the direct,
+ * unambiguous answer to "is the new token actually being used?": rather
+ * than inferring it from an env var you *think* you set, the studio can
+ * just say which account it resolved to.
+ */
+export async function fetchFigmaIdentity(token?: string): Promise<FigmaIdentity> {
+  const authToken = token ?? getFigmaToken();
+  const res = await fetch(`${FIGMA_API_BASE}/v1/me`, { headers: { "X-Figma-Token": authToken } });
+  if (res.status === 403) {
+    throw new Error("Figma API returned 403 for this token — it may be invalid, revoked, or expired.");
+  }
+  if (!res.ok) {
+    throw new Error(`Figma API error ${res.status} while checking token identity: ${await res.text()}`);
+  }
+  const body = (await res.json()) as { email?: string; handle?: string };
+  return { email: body.email ?? "unknown", handle: body.handle ?? "unknown" };
 }

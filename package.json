@@ -1,0 +1,12 @@
+{
+  "name": "figma-verify-repo",
+  "private": true,
+  "description": "Repo-root convenience scripts. The real package lives in ./figma-verify — this just forwards so `npm run studio` works after a clone without a second cd.",
+  "scripts": {
+    "studio": "npm run studio --prefix figma-verify",
+    "test": "npm test --prefix figma-verify",
+    "build": "npm run build --prefix figma-verify",
+    "demo:report": "npm run demo:report --prefix figma-verify",
+    "demo:open": "npm run demo:open --prefix figma-verify"
+  }
+}

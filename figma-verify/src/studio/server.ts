@@ -15,7 +15,7 @@ import { dirname, extname, join, normalize, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import type { AddressInfo } from "node:net";
-import { fetchFigmaNodesResponse, type FigmaNodesResponse } from "../figma/client.js";
+import { fetchFigmaIdentity, fetchFigmaNodesResponse, type FigmaNodesResponse } from "../figma/client.js";
 import { parseFigmaUrl } from "../figma/url.js";
 import { renderHtmlReport } from "../report/render-html.js";
 import { verifyFromFixture, verifyImplementation } from "../verify.js";
@@ -309,14 +309,43 @@ function serveStatic(res: ServerResponse, abs: string): void {
   stream.pipe(res);
 }
 
+/**
+ * Best-effort answer to "is FIGMA_TOKEN actually the token I think it is?"
+ * Resolves the token (if any) to the Figma account it belongs to via
+ * `GET /v1/me`, so switching tokens/accounts can be confirmed directly
+ * instead of just trusting an `export` in some other terminal. Never
+ * throws — a broken/missing token shouldn't stop the studio from serving
+ * fixture + live-URL compares, which don't need one at all.
+ */
+async function resolveFigmaIdentity(): Promise<
+  { status: "ok"; email: string; handle: string } | { status: "missing" | "invalid"; detail?: string }
+> {
+  if (!process.env.FIGMA_TOKEN) return { status: "missing" };
+  try {
+    const identity = await fetchFigmaIdentity();
+    return { status: "ok", email: identity.email, handle: identity.handle };
+  } catch (err) {
+    return { status: "invalid", detail: (err as Error).message };
+  }
+}
+
 async function main(): Promise<void> {
   await ensureReportHtml();
+
+  const figmaIdentity = await resolveFigmaIdentity();
+  if (figmaIdentity.status === "ok") {
+    console.log(`Figma token: ${figmaIdentity.email} (@${figmaIdentity.handle}) — this is the account being used for Figma-link compares.`);
+  } else if (figmaIdentity.status === "invalid") {
+    console.log(`Figma token: set, but could not verify it — ${figmaIdentity.detail}`);
+  } else {
+    console.log("Figma token: none set (FIGMA_TOKEN is empty) — Figma-link compares will fail; fixture/liveURL compares still work.");
+  }
 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://127.0.0.1:${PORT}`);
     try {
       if (req.method === "GET" && url.pathname === "/api/health") {
-        sendJson(res, 200, { ok: true, studio: true });
+        sendJson(res, 200, { ok: true, studio: true, figmaIdentity });
         return;
       }
       if (req.method === "POST" && url.pathname === "/api/verify") {
