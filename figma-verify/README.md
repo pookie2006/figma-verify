@@ -262,32 +262,34 @@ There is also an Actions workflow ([`.github/workflows/deploy-pages.yml`](../.gi
 
 ### Live compare from the report UI
 
-The GitHub Pages demo is static (it can’t run Playwright). For a real compare, run the local studio and use **links on both sides** — that is the supported path. File upload is still a work in progress (folder uploads in particular are flaky: size limits, `node_modules`, and macOS permissions).
+The GitHub Pages demo is static (it can’t run Playwright). For a real compare, run your app on localhost, export a Figma token, and paste a Figma frame link. File upload is still a work in progress.
+
+**1. Start your implementation on localhost** (leave this terminal open):
+
+```bash
+cd /path/to/your-app
+npm start          # or: npm run dev
+```
+
+Note the URL it prints — e.g. `http://localhost:3000/` or `http://localhost:5173/your-page`.
+
+**2. Create a Figma personal access token** at [Figma settings → Personal access tokens](https://www.figma.com/settings). The token’s account must be able to open the file you will compare.
+
+**3. Export the token and start the studio** (a second terminal, leave it open):
 
 ```bash
 cd figma-verify
-npm run studio                # report → http://127.0.0.1:4174
-                              # demo implementation stays up on http://127.0.0.1:4173/
+npm install
+npx playwright install chromium
+export FIGMA_TOKEN=figd_...    # same terminal you start the studio from
+npm run studio                 # report → http://127.0.0.1:4174
 ```
 
-**Recruiter / first-run pair:** click **Load demo** (Signup Card, no token), or paste a real Figma link:
+**4. Copy a Figma frame link.** In Figma, select the frame → **Copy/Paste as** → **Copy link to selection**. You need a `figma.com/design/…?node-id=…` URL (or `/file/`, `/proto/`, `/board/`). A community page URL is not enough.
 
-| Inserter | Mode | Paste this |
-|---|---|---|
-| Code folder | **Link** | `http://127.0.0.1:4173/` |
-| Figma mockup | **Link** | `https://www.figma.com/design/qWrhGNCtP9avcXdYiaBVxE/Buttons-Library--Community-?node-id=1-5` |
+**5. In the report** (http://127.0.0.1:4174), click **Link** on both inserters: paste the localhost URL in **Code folder**, paste the Figma frame link in **Figma mockup**, then **Compare**.
 
-That Figma URL is a public community [Buttons Library](https://www.figma.com/design/qWrhGNCtP9avcXdYiaBVxE/Buttons-Library--Community-?node-id=1-5) — a `figma.com` design/file link the Link field accepts. Needs `FIGMA_TOKEN` in the same terminal as `npm run studio`. Drift against the Signup Card demo is expected (different designs).
-
-For a token-free pair that matches the Signup Card, click **Load demo**.
-
-**Your own project (still prefer Link):**
-
-1. **Code** — paste a running dev server URL (e.g. `http://localhost:3000/search-page`).
-2. **Figma** — paste a Figma `design` / `file` / `proto` / `board` URL with `?node-id=...`. Needs `FIGMA_TOKEN` set in the same terminal before `npm run studio`.
-3. Click **Compare**.
-
-**File upload is a work in progress.** The File toggles are still there (code folder = built `build/` or `dist/` output; Figma = a nodes-API fixture JSON like `demo/design-fixture.json`), but prefer links. Images are preview-only and cannot drive the structural score. If you already have a saved fixture JSON from **Save fixture**, File mode on the Figma side is the one upload path that is solid (offline, no token, no rate limit).
+**File upload is a work in progress.** Prefer links. Images are preview-only and cannot drive the structural score. If you already have a saved fixture JSON from **Save fixture**, File mode on the Figma side is the one upload path that is solid (offline, no token, no rate limit).
 
 CLI/MCP remain the headless path (`--fixture` + live URL, or a Figma URL + `FIGMA_TOKEN`).
 
