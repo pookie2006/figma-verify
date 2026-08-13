@@ -29,6 +29,9 @@ Figma Verify closes the loop. The agent implements, verifies, reads the drift re
 ![Figma Verify report: fidelity score, side-by-side design vs implementation, layers tree, and agent fix instructions](../docs/recruiter-report.png)
 *Generated from the bundled Signup Card demo — every pixel of this UI is real output, not a mockup.*
 
+![Figma Verify on Spectator's Sources: fidelity 38.9, side-by-side design vs implementation, 33 agent fix instructions](../docs/spec-demo-image.png)
+*The same report, run on the author's own [Columbia Daily Spectator](https://www.columbiaspectator.com/) work — Spectator's Sources (fidelity 38.9, 19 missing elements, 33 ordered fixes).*
+
 <details>
 <summary>Mobile view (390px)</summary>
 

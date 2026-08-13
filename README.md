@@ -6,6 +6,12 @@
 
 ![Figma Verify report: fidelity score, side-by-side design vs implementation, layers tree, and agent fix instructions](docs/recruiter-report.png)
 
+*Bundled Signup Card demo.*
+
+![Figma Verify on Spectator's Sources: fidelity 38.9, side-by-side design vs implementation, 33 agent fix instructions](docs/spec-demo-image.png)
+
+*A real compare on the author's own [Columbia Daily Spectator](https://www.columbiaspectator.com/) work — Spectator's Sources (fidelity 38.9, 19 missing elements, 33 ordered fixes).*
+
 For a real compare on your machine, use **Link** mode on both inserters. File upload is still a work in progress.
 
 ### Recruiter try-it (two pasteable links)
