@@ -89,6 +89,41 @@ export function clearFigmaNodeCache(): void {
   nodeCache.clear();
 }
 
+/**
+ * Build an actionable 429 message from Figma's own diagnostic headers
+ * (docs: developers.figma.com/docs/rest-api/rate-limits) instead of just
+ * echoing the status code. Two points worth calling out explicitly because
+ * they're easy to get wrong:
+ *  - Personal-access-token limits are tracked per *user* (whoever generated
+ *    the token), not per token string — minting a second token from the
+ *    same account draws from the same budget and won't help.
+ *  - The limit also depends on the plan of the FILE being fetched, not just
+ *    your own seat: a file living in a free "Starter" plan is capped as low
+ *    as 6 requests/month for this endpoint, even from an Enterprise seat.
+ */
+function formatRateLimitError(res: Response): string {
+  const retryAfter = res.headers.get("retry-after");
+  const planTier = res.headers.get("x-figma-plan-tier");
+  const limitType = res.headers.get("x-figma-rate-limit-type");
+  const upgradeLink = res.headers.get("x-figma-upgrade-link");
+
+  const lines = [
+    `Figma API rate limit exceeded (429) after retrying ${MAX_RATE_LIMIT_RETRIES} times.`,
+    planTier || limitType
+      ? `Figma reports: plan tier "${planTier ?? "unknown"}", limit type "${limitType ?? "unknown"}".`
+      : undefined,
+    "A new personal access token won't help — Figma tracks personal-access-token limits per Figma *account* " +
+      "(whoever generated the token), not per token string, so a second token draws from the same budget.",
+    "This is also governed by the plan of the Figma FILE you're fetching, not just your own seat: files on a " +
+      "free/Starter plan are capped as low as 6 requests/month for this endpoint regardless of your seat elsewhere.",
+    `Wait ${retryAfter ? `about ${retryAfter}s` : "a minute or two (longer if the file is on a Starter plan)"} and try again — the design ` +
+      `is now cached for ${Math.round(CACHE_TTL_MS / 60_000)} minutes per run, so re-comparing the same Figma link ` +
+      "while you fix the implementation won't re-hit the API.",
+    upgradeLink ? `Figma suggests: ${upgradeLink}` : undefined,
+  ];
+  return lines.filter(Boolean).join(" ");
+}
+
 async function fetchWithRateLimitRetry(url: string, authToken: string): Promise<Response> {
   for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt++) {
     const res = await fetch(url, { headers: { "X-Figma-Token": authToken } });
@@ -124,15 +159,7 @@ export async function fetchFigmaNode(
   const res = await fetchWithRateLimitRetry(url, authToken);
 
   if (res.status === 429) {
-    const retryAfter = res.headers.get("retry-after");
-    throw new Error(
-      `Figma API rate limit exceeded (429) after retrying ${MAX_RATE_LIMIT_RETRIES} times. ` +
-        "Figma's REST API allows a limited number of requests per minute per token, and repeatedly clicking " +
-        "Compare (or running many verifies back-to-back) can hit it. Wait " +
-        `${retryAfter ? `about ${retryAfter}s` : "a minute or two"} and try again — the design is now cached for ` +
-        `${Math.round(CACHE_TTL_MS / 60_000)} minutes per run, so re-comparing the same Figma link while you fix the ` +
-        "implementation won't re-hit the API."
-    );
+    throw new Error(formatRateLimitError(res));
   }
   if (res.status === 403) {
     throw new Error("Figma API returned 403. Check that FIGMA_TOKEN is valid and has access to this file.");
