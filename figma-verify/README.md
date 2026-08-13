@@ -280,6 +280,8 @@ npm run studio          # http://127.0.0.1:4174
 
 CLI/MCP remain the headless path (`--fixture` + live URL, or a Figma URL + `FIGMA_TOKEN`).
 
+**"Figma API rate limit exceeded (429)"**: Figma's REST API allows a limited number of requests per minute per token, and clicking Compare repeatedly for the same design (e.g. while iterating on the implementation) can hit it. The studio caches a fetched design (by file key + node id) for 5 minutes per run, so re-comparing the *same* Figma link only re-fetches once — the error should be rare unless you're also switching between several different Figma links in quick succession. If you do hit it, `fetchFigmaNode` already retries a few times with backoff before giving up; if it still fails, wait a minute or two and try again.
+
 ## Tests
 
 ```bash

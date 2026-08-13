@@ -57,16 +57,83 @@ export interface FigmaNodesResponse {
 const FIGMA_API_BASE = "https://api.figma.com";
 
 /**
+ * How many times to retry a 429 before giving up. Figma's REST API rate
+ * limit is a short sliding window (docs: figma.com/developers/api#rate-limits),
+ * so a couple of short waits usually clear it — this is not meant to paper
+ * over sustained abuse, just the "clicked Compare twice in a row" case.
+ */
+const MAX_RATE_LIMIT_RETRIES = 3;
+
+/** Ceiling on any single backoff wait, so a bogus/huge Retry-After header can't hang the studio server. */
+const MAX_BACKOFF_MS = 20_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * The same design (fileKey + nodeId) is often fetched repeatedly in one
+ * studio-server process — every "Compare" click re-fetches it even when
+ * only the implementation changed. Caching for a short TTL turns an
+ * iterate-on-code-then-Compare loop into a single Figma API call instead of
+ * one per click, which is the single biggest lever against hitting the
+ * rate limit in normal use. Keyed process-wide (module-level), so it
+ * naturally covers the studio server's lifetime and is a no-op for the
+ * one-shot CLI.
+ */
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const nodeCache = new Map<string, { node: FigmaNode; fetchedAt: number }>();
+
+/** Exposed for tests; also useful if a caller wants to force a fresh fetch after editing the Figma file. */
+export function clearFigmaNodeCache(): void {
+  nodeCache.clear();
+}
+
+async function fetchWithRateLimitRetry(url: string, authToken: string): Promise<Response> {
+  for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt++) {
+    const res = await fetch(url, { headers: { "X-Figma-Token": authToken } });
+    if (res.status !== 429) return res;
+
+    if (attempt === MAX_RATE_LIMIT_RETRIES) return res; // let the caller turn this into the final error
+
+    const retryAfterHeader = res.headers.get("retry-after");
+    const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : NaN;
+    const backoffMs = Number.isFinite(retryAfterMs) && retryAfterMs >= 0 ? retryAfterMs : 2 ** attempt * 1000;
+    await sleep(Math.min(backoffMs, MAX_BACKOFF_MS));
+  }
+  throw new Error("unreachable"); // loop always returns or throws above
+}
+
+/**
  * Fetch a single node (frame) subtree from the Figma REST API.
  */
-export async function fetchFigmaNode(ref: FigmaRef, token?: string): Promise<FigmaNode> {
+export async function fetchFigmaNode(
+  ref: FigmaRef,
+  token?: string,
+  opts?: { skipCache?: boolean }
+): Promise<FigmaNode> {
+  const cacheKey = `${ref.fileKey}:${ref.nodeId}`;
+  if (!opts?.skipCache) {
+    const cached = nodeCache.get(cacheKey);
+    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached.node;
+  }
+
   const authToken = token ?? getFigmaToken();
   const url = `${FIGMA_API_BASE}/v1/files/${ref.fileKey}/nodes?ids=${encodeURIComponent(ref.nodeId)}&geometry=paths`;
 
-  const res = await fetch(url, {
-    headers: { "X-Figma-Token": authToken },
-  });
+  const res = await fetchWithRateLimitRetry(url, authToken);
 
+  if (res.status === 429) {
+    const retryAfter = res.headers.get("retry-after");
+    throw new Error(
+      `Figma API rate limit exceeded (429) after retrying ${MAX_RATE_LIMIT_RETRIES} times. ` +
+        "Figma's REST API allows a limited number of requests per minute per token, and repeatedly clicking " +
+        "Compare (or running many verifies back-to-back) can hit it. Wait " +
+        `${retryAfter ? `about ${retryAfter}s` : "a minute or two"} and try again — the design is now cached for ` +
+        `${Math.round(CACHE_TTL_MS / 60_000)} minutes per run, so re-comparing the same Figma link while you fix the ` +
+        "implementation won't re-hit the API."
+    );
+  }
   if (res.status === 403) {
     throw new Error("Figma API returned 403. Check that FIGMA_TOKEN is valid and has access to this file.");
   }
@@ -84,5 +151,6 @@ export async function fetchFigmaNode(ref: FigmaRef, token?: string): Promise<Fig
       `Node ${ref.nodeId} was not present in the API response. Make sure the URL's node-id points at a frame in this file.`
     );
   }
+  nodeCache.set(cacheKey, { node: entry.document, fetchedAt: Date.now() });
   return entry.document;
 }
