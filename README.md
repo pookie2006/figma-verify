@@ -14,25 +14,53 @@
 
 For a real compare on your machine, use **Link** mode on both inserters. File upload is still a work in progress.
 
-### Recruiter try-it (two pasteable links)
+### How to run a compare
+
+**1. Start your implementation on localhost** (leave this terminal open):
 
 ```bash
+cd /path/to/your-app
+npm start          # or: npm run dev
+```
+
+Note the URL it prints — e.g. `http://localhost:3000/` or `http://localhost:5173/your-page`.
+
+**2. Create a Figma personal access token**
+
+1. Open [Figma settings → Personal access tokens](https://www.figma.com/settings).
+2. Generate a token (needs access to the file you will compare).
+3. Copy it. You will only see the full value once.
+
+**3. Export the token and start the studio** (a second terminal, leave it open):
+
+```bash
+# from the clone root (pookie2006/figma-verify)
 cd figma-verify
 npm install
 npx playwright install chromium
-npm run studio
+export FIGMA_TOKEN=figd_...    # same terminal you start the studio from
+npm run studio                 # report → http://127.0.0.1:4174
 ```
 
-Then open http://127.0.0.1:4174. For the bundled Signup Card (no Figma file, no token), click **Load demo**.
+`npm run studio` from the **repo root** also works if that script exists in your checkout.
 
-To paste your own Figma frame instead:
+**4. Copy a Figma frame link**
 
-| Inserter | Click | Paste |
-|---|---|---|
-| **Code folder** | **Link** | `http://127.0.0.1:4173/` (or your running app) |
-| **Figma mockup** | **Link** | a `figma.com/design/…?node-id=…` link from **Copy link to selection** |
+In Figma, select the frame → right-click → **Copy/Paste as** → **Copy link to selection**. The URL must look like:
 
-There is no universal public `figma.com/design/…` URL that works for every account. Community pages (like Figma’s [Simple Design System](https://www.figma.com/community/file/1380235722331273046/simple-design-system)) are not pasteable as-is — open the file in Figma, select a frame, then **Copy link to selection**. That copied URL is what the Link field accepts. Export `FIGMA_TOKEN` in the same terminal before `npm run studio`.
+`https://www.figma.com/design/…/…?node-id=…`  
+(or `/file/`, `/proto/`, `/board/` — same idea). A community page URL is not enough.
+
+**5. Paste both links in the report**
+
+Open http://127.0.0.1:4174, click **Link** on both inserters:
+
+| Inserter | Paste |
+|---|---|
+| **Code folder** | your localhost URL from step 1 |
+| **Figma mockup** | the Figma frame link from step 4 |
+
+Click **Compare**.
 
 Figma's MCP server pushes design context *into* agents, and agents generate code from it. But nothing closes the loop: no tool lets the agent **verify** that the implementation actually matches the design. Figma Verify closes that loop — the agent implements, verifies, reads the drift report, fixes its code, and re-runs until the fidelity score is 100.
 
@@ -60,25 +88,11 @@ All code lives in [`figma-verify/`](figma-verify/):
 | `figma-verify/tests/` | Fixture-driven unit tests plus a Playwright e2e suite |
 | `figma-verify/demo/` | A deliberately flawed implementation of a design frame, with a recorded design fixture for offline runs |
 
-## Quickstart
+## More
 
-The GitHub repo and the npm package are both named `figma-verify`, so after a clone you are in the **repo root** (this folder). The runnable package — including `npm run studio` — is one level down:
+The GitHub repo and the npm package are both named `figma-verify`. After a clone you are in the **repo root**; `npm run studio` lives in [`figma-verify/`](figma-verify/) (the root `package.json` forwards into it). If you see `Missing script: "studio"`, `git pull origin main` and try again.
 
-```bash
-# from the clone root (pookie2006/figma-verify)
-git pull origin main          # needed if this checkout predates the studio server
-cd figma-verify               # the inner package, the one with src/studio/server.ts
-npm install
-npx playwright install chromium
-export FIGMA_TOKEN=figd_...   # same terminal you start the studio from
-npm run studio                # http://127.0.0.1:4174
-```
-
-Then in the report toolbar, click **Link** on both inserters: paste your running app URL (e.g. `http://localhost:3000/search-page`) and your Figma link. Prefer links — file upload is still a work in progress.
-
-`npm run studio` from the **repo root** also works (it forwards into the inner package), as long as you have pulled a revision that includes that script. If you see `Missing script: "studio"`, this checkout is older than the studio server — `git pull origin main` and try again. Do not run it from a leftover copy under Downloads that was never updated.
-
-See the full documentation in [`figma-verify/README.md`](figma-verify/README.md) for MCP registration (Cursor, Claude Code, VS Code), the `verify_implementation` and `get_design_spec` tools, CLI usage, tolerances, and the severity model.
+See [`figma-verify/README.md`](figma-verify/README.md) for MCP registration (Cursor, Claude Code, VS Code), the `verify_implementation` and `get_design_spec` tools, CLI usage, tolerances, and the severity model.
 
 ## License
 
