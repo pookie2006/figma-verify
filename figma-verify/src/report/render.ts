@@ -37,6 +37,11 @@ export function renderMarkdown(report: DriftReport): string {
         })
         .join(" · ")
   );
+  if (report.similarity.floor > 0) {
+    lines.push(
+      `_Resemblance floor: ${report.similarity.floor}/100 (applies to all profiles except Strict), from shared structure/colors/fonts/text with the design that the deduction-based score alone doesn't credit._  `
+    );
+  }
   lines.push("");
 
   if (issueCount === 0) {

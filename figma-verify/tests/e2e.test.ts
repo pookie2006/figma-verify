@@ -114,10 +114,16 @@ describe("e2e: flawed demo vs design fixture", () => {
   it("computes all four scoring profiles", () => {
     const { scores } = output.report;
     expect(scores.balanced).toBe(output.report.fidelityScore); // default profile
-    expect(scores.strict).toBeLessThanOrEqual(40); // criticals present -> capped
+    // Strict is exempt from the resemblance floor, so it still reflects the
+    // raw, uncushioned deduction total (criticals present -> capped at 40).
+    expect(scores.strict).toBeLessThanOrEqual(40);
     expect(scores.perElement).toBeGreaterThan(0);
-    // Cascade discount: most mediums are fallout from the padding flaw.
-    expect(scores.rootCause).toBeGreaterThan(scores.balanced);
+    // Cascade discount: most mediums are fallout from the padding flaw, so
+    // root-cause's raw (pre-floor) score is higher than balanced's. This
+    // fixture is a mostly-faithful build (high structural/color/font/text
+    // overlap), though, so both raw scores land below the resemblance
+    // floor and end up tied at the floor rather than strictly ordered.
+    expect(scores.rootCause).toBeGreaterThanOrEqual(scores.balanced);
   });
 
   it("tags position drift caused by the card's padding flaw as cascades", () => {

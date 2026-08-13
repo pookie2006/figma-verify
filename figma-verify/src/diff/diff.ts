@@ -1,6 +1,7 @@
 import type { Tolerances } from "../config.js";
 import { generateFixInstructions } from "../report/instructions.js";
 import { computeScores, DEFAULT_SCORING_PROFILE } from "./scoring.js";
+import { computeSimilaritySignals, similarityFloor } from "./similarity.js";
 import type {
   DriftReport,
   ElementReport,
@@ -87,6 +88,21 @@ export function diffMatches(
   tagCascades(designById, elements);
 
   const scores = computeScores(elements);
+  const structuralCoverage = elements.length
+    ? elements.filter((e) => e.matched).length / elements.length
+    : null;
+  const similaritySignals = computeSimilaritySignals(design, dom, structuralCoverage);
+  const floor = similarityFloor(similaritySignals);
+  if (floor > 0) {
+    // Every profile except strict gets the floor: strict is documented as
+    // an uncompromising CI release gate ("missing elements can never
+    // average out"), so it deliberately stays exempt.
+    for (const key of Object.keys(scores) as ScoringProfile[]) {
+      if (key === "strict") continue;
+      scores[key] = Math.max(scores[key], floor);
+    }
+  }
+
   const scoringProfile = meta.scoringProfile ?? DEFAULT_SCORING_PROFILE;
   const fixInstructions = generateFixInstructions(elements, missing, design);
 
@@ -99,6 +115,7 @@ export function diffMatches(
     scoringProfile,
     scores,
     totals,
+    similarity: { ...similaritySignals, floor },
     missing,
     elements,
     fixInstructions,

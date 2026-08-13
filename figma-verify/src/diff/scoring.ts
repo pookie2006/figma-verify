@@ -28,7 +28,7 @@ export const SCORING_PROFILES: Record<ScoringProfile, { label: string; descripti
   strict: {
     label: "Strict",
     description:
-      "Balanced deductions, but any critical caps the score at 40 and any high at 75. Missing elements can never average out; good as a CI release gate.",
+      "Balanced deductions, but any critical caps the score at 40 and any high at 75. Missing elements can never average out, and it's exempt from the resemblance floor other profiles get; good as a CI release gate.",
   },
   perElement: {
     label: "Per-element",

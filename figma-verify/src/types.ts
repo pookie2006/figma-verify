@@ -134,6 +134,21 @@ export interface DriftReport {
   /** Score under every profile, for comparison. */
   scores: Record<ScoringProfile, number>;
   totals: Record<Severity, number>;
+  /**
+   * Page-level resemblance signals (shared colors/fonts/text) used as a
+   * floor under every profile's score, so a totally different layout that
+   * still shares real visual/copy DNA with the design doesn't score
+   * identically to one that shares nothing at all. See diff/similarity.ts.
+   */
+  similarity: {
+    /** Fraction of scored elements that found any DOM counterpart, however imperfectly styled. */
+    structuralCoverage: number | null;
+    colorOverlap: number | null;
+    fontOverlap: number | null;
+    textOverlap: number | null;
+    /** The floor actually applied (0..SIMILARITY_FLOOR_CAP); not applied to the strict profile. */
+    floor: number;
+  };
   /** Design elements with no acceptable DOM counterpart. */
   missing: { designId: string; designName: string; role: Role }[];
   elements: ElementReport[];
