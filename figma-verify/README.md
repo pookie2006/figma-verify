@@ -208,21 +208,28 @@ Also works in Claude Code (`claude mcp add`) and VS Code — anything that speak
 
 `figma_url` is a "Copy link to selection" URL — it must contain `?node-id=...`.
 
-### CLI (for demos and debugging)
+### CLI (terminal drift report)
+
+Same compare as the visual studio, printed in the terminal: missing elements, per-property diffs, and ordered fix instructions.
 
 ```bash
-# Against the real Figma API:
-npm run cli -- "https://www.figma.com/design/KEY/name?node-id=1-2" http://localhost:5173
+# Against the real Figma API (needs FIGMA_TOKEN + your localhost app):
+export FIGMA_TOKEN=figd_...
+npm run cli -- "https://www.figma.com/design/KEY/name?node-id=1-2" http://localhost:3000/
 
 # Offline, using the recorded fixture (no token needed):
 npm run cli -- --fixture demo/design-fixture.json "file://$PWD/demo/index.html"
 
-# With the visual report and a different scoring profile:
-npm run cli -- --fixture demo/design-fixture.json "file://$PWD/demo/index.html" \
-  --html report.html --scoring rootCause
+# Both: terminal report + visual HTML from the same run:
+npm run cli -- "https://www.figma.com/design/KEY/name?node-id=1-2" http://localhost:3000/ \
+  --html report.html
 ```
 
-Options: `--viewport <px>`, `--scoring balanced|strict|perElement|rootCause`, `--html <path>`, `--json`.
+![Terminal drift report: fidelity score, missing elements, property diffs, and ordered fix instructions](../docs/cli-terminal-output.png)
+
+*CLI output against the bundled Signup Card demo. A live Figma URL + localhost prints the same kind of report.*
+
+Options: `--viewport <px>`, `--scoring balanced|strict|perElement|rootCause`, `--html <path>`, `--json`, `--instructions`.
 Exit code 0 = fidelity 100, 1 = drift found, 2 = error.
 
 ## Demo
@@ -260,9 +267,9 @@ Supporting pages on the same site:
 
 There is also an Actions workflow ([`.github/workflows/deploy-pages.yml`](../.github/workflows/deploy-pages.yml)) that regenerates the report on push to `main`. The live source of truth for the URL above is still the committed `docs/` folder (Settings → Pages → Deploy from a branch → `/docs`). If you switch Source to **GitHub Actions**, that workflow becomes the publisher instead.
 
-### Live compare from the report UI
+### Visual compare from the report UI
 
-The GitHub Pages demo is static (it can’t run Playwright). For a real compare, run your app on localhost, export a Figma token, and paste a Figma frame link. File upload is still a work in progress.
+The GitHub Pages site is static (it can’t run Playwright). For a live visual compare, run your app on localhost, export a Figma token, and paste a Figma frame link — or use the CLI above (`--html`) to write the same report from the terminal. File upload is still a work in progress.
 
 **1. Start your implementation on localhost** (leave this terminal open):
 
