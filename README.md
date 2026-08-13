@@ -12,9 +12,13 @@
 
 *A real compare on the author's own [Columbia Daily Spectator](https://www.columbiaspectator.com/) work — Spectator's Sources (fidelity 38.9, 19 missing elements, 33 ordered fixes).*
 
-For a real compare on your machine, use **Link** mode on both inserters. File upload is still a work in progress.
+![Terminal drift report: fidelity score, missing elements, property diffs, and ordered fix instructions](docs/cli-terminal-output.png)
 
-### How to run a compare
+*The same compare in the terminal — missing elements, property diffs, and ordered fix instructions.*
+
+You can compare in the **terminal** (markdown drift report) and in the **visual report** (side-by-side UI). Same inputs either way: a localhost URL and a Figma frame link. File upload is still a work in progress.
+
+### Shared setup
 
 **1. Start your implementation on localhost** (leave this terminal open):
 
@@ -31,34 +35,57 @@ Note the URL it prints — e.g. `http://localhost:3000/` or `http://localhost:51
 2. Generate a token (needs access to the file you will compare).
 3. Copy it. You will only see the full value once.
 
-**3. Export the token and start the studio** (a second terminal, leave it open):
-
-```bash
-# from the clone root (pookie2006/figma-verify)
-cd figma-verify
-npm install
-npx playwright install chromium
-export FIGMA_TOKEN=figd_...    # same terminal you start the studio from
-npm run studio                 # report → http://127.0.0.1:4174
-```
-
-`npm run studio` from the **repo root** also works if that script exists in your checkout.
-
-**4. Copy a Figma frame link**
+**3. Copy a Figma frame link**
 
 In Figma, select the frame → right-click → **Copy/Paste as** → **Copy link to selection**. The URL must look like:
 
 `https://www.figma.com/design/…/…?node-id=…`  
 (or `/file/`, `/proto/`, `/board/` — same idea). A community page URL is not enough.
 
-**5. Paste both links in the report**
+**4. Install the package once**
+
+```bash
+# from the clone root (pookie2006/figma-verify)
+cd figma-verify
+npm install
+npx playwright install chromium
+export FIGMA_TOKEN=figd_...    # same terminal you run the CLI or studio from
+```
+
+`npm run studio` / `npm run cli` from the **repo root** also work if those scripts exist in your checkout.
+
+### Terminal compare
+
+Prints the full drift report (missing elements, per-property diffs, agent fix steps) in the terminal:
+
+```bash
+cd figma-verify
+export FIGMA_TOKEN=figd_...
+npm run cli -- "https://www.figma.com/design/KEY/name?node-id=1-2" http://localhost:3000/
+```
+
+Use your frame link from step 3 and your localhost URL from step 1. Exit code `0` = fidelity 100, `1` = drift found, `2` = error.
+
+Add `--html report.html` to also write the visual report from the same run.
+
+![Terminal drift report: fidelity score, missing elements, property diffs, and ordered fix instructions](docs/cli-terminal-output.png)
+
+*CLI output against the bundled Signup Card demo (`npm run cli -- --fixture demo/design-fixture.json "file://$PWD/demo/index.html"`). Same shape of report you get with a live Figma URL + localhost.*
+
+### Visual compare
+
+```bash
+cd figma-verify
+export FIGMA_TOKEN=figd_...
+npm run studio                 # report → http://127.0.0.1:4174
+```
 
 Open http://127.0.0.1:4174, click **Link** on both inserters:
 
 | Inserter | Paste |
 |---|---|
 | **Code folder** | your localhost URL from step 1 |
-| **Figma mockup** | the Figma frame link from step 4 |
+| **Figma mockup** | the Figma frame link from step 3 |
 
 Click **Compare**.
 
