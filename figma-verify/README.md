@@ -270,16 +270,16 @@ npm run studio                # report → http://127.0.0.1:4174
                               # demo implementation stays up on http://127.0.0.1:4173/
 ```
 
-**Recruiter / first-run pair:** click **Load demo** (Signup Card, no token), or paste a real Figma link:
+**Recruiter / first-run pair:** click **Load demo** (Signup Card, no Figma file, no token).
+
+To paste your own Figma frame instead:
 
 | Inserter | Mode | Paste this |
 |---|---|---|
-| Code folder | **Link** | `http://127.0.0.1:4173/` |
-| Figma mockup | **Link** | `https://www.figma.com/design/qWrhGNCtP9avcXdYiaBVxE/Buttons-Library--Community-?node-id=1-5` |
+| Code folder | **Link** | `http://127.0.0.1:4173/` (or your running app) |
+| Figma mockup | **Link** | a `figma.com/design/…?node-id=…` link from **Copy link to selection** |
 
-That Figma URL is a public community [Buttons Library](https://www.figma.com/design/qWrhGNCtP9avcXdYiaBVxE/Buttons-Library--Community-?node-id=1-5) — a `figma.com` design/file link the Link field accepts. Needs `FIGMA_TOKEN` in the same terminal as `npm run studio`. Drift against the Signup Card demo is expected (different designs).
-
-For a token-free pair that matches the Signup Card, click **Load demo**.
+There is no universal public `figma.com/design/…` URL that works for every account. Community pages (like Figma’s [Simple Design System](https://www.figma.com/community/file/1380235722331273046/simple-design-system)) are not pasteable as-is — open the file in Figma, select a frame, then **Copy link to selection**. That copied URL is what the Link field accepts. Needs `FIGMA_TOKEN` in the same terminal as `npm run studio`.
 
 **Your own project (still prefer Link):**
 

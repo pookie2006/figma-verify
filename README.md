@@ -23,16 +23,16 @@ npx playwright install chromium
 npm run studio
 ```
 
-Then open http://127.0.0.1:4174. Either click **Load demo** (Signup Card, no token), or paste a real Figma link:
+Then open http://127.0.0.1:4174. For the bundled Signup Card (no Figma file, no token), click **Load demo**.
+
+To paste your own Figma frame instead:
 
 | Inserter | Click | Paste |
 |---|---|---|
-| **Code folder** | **Link** | `http://127.0.0.1:4173/` |
-| **Figma mockup** | **Link** | `https://www.figma.com/design/qWrhGNCtP9avcXdYiaBVxE/Buttons-Library--Community-?node-id=1-5` |
+| **Code folder** | **Link** | `http://127.0.0.1:4173/` (or your running app) |
+| **Figma mockup** | **Link** | a `figma.com/design/…?node-id=…` link from **Copy link to selection** |
 
-That Figma URL is a public community file ([Buttons Library](https://www.figma.com/design/qWrhGNCtP9avcXdYiaBVxE/Buttons-Library--Community-?node-id=1-5)) — a `figma.com` design link the Link field accepts. Export `FIGMA_TOKEN` in the same terminal before `npm run studio`. The compare against the Signup Card demo will show a lot of drift; that is expected (different designs). Click **Compare**.
-
-For a token-free pair that matches the Signup Card, click **Load demo** instead.
+There is no universal public `figma.com/design/…` URL that works for every account. Community pages (like Figma’s [Simple Design System](https://www.figma.com/community/file/1380235722331273046/simple-design-system)) are not pasteable as-is — open the file in Figma, select a frame, then **Copy link to selection**. That copied URL is what the Link field accepts. Export `FIGMA_TOKEN` in the same terminal before `npm run studio`.
 
 Figma's MCP server pushes design context *into* agents, and agents generate code from it. But nothing closes the loop: no tool lets the agent **verify** that the implementation actually matches the design. Figma Verify closes that loop — the agent implements, verifies, reads the drift report, fixes its code, and re-runs until the fidelity score is 100.
 
