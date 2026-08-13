@@ -1,13 +1,10 @@
 name: Deploy demo to GitHub Pages
 
-# Regenerates the self-contained HTML report from the demo fixture and
-# publishes it (plus the flawed implementation and the pixel-perfect
-# reference build) to GitHub Pages. Requires no external credentials —
-# only the "pages: write" permission below, granted automatically to the
-# workflow's GITHUB_TOKEN.
-#
-# One-time setup (if the first run fails with a "Pages not enabled" error):
-# repo Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+# Regenerates the self-contained HTML report from the demo fixture.
+# The live site (https://pookie2006.github.io/figma-verify/) is published
+# from the committed docs/ folder on main (Settings → Pages → Deploy from
+# a branch → /docs). This workflow is the optional Actions publisher —
+# it only goes live if Pages Source is switched to "GitHub Actions".
 
 on:
   push:

@@ -164,6 +164,7 @@ export const VIEWER_JS = `
   var pendingPreviewOnly = false;
   var studioReady = null;
   var FIGMA_URL_RE = /^https?:\\/\\/([a-z0-9-]+\\.)*figma\\.com\\//i;
+  var HTTP_URL_RE = /^https?:\\/\\//i;
   var LIVE_URL_RE = /^(https?|file):\\/\\//i;
   var EXCLUDED_SEGMENT_RE = /^(node_modules|\\.git|\\.hg|\\.svn|\\.next|\\.turbo|\\.cache|\\.parcel-cache|coverage|\\.nyc_output)$/i;
   var MAX_UPLOAD_BYTES = 80 * 1024 * 1024;
@@ -255,7 +256,7 @@ export const VIEWER_JS = `
 
   // ---------- Figma inserter: toggle between file upload and paste-a-link ----------
   function syncFigmaSaveFixtureBtn() {
-    figmaSaveFixtureBtn.hidden = !pendingFigmaUrl;
+    figmaSaveFixtureBtn.hidden = !(pendingFigmaUrl && FIGMA_URL_RE.test(pendingFigmaUrl));
   }
 
   function setFigmaMode(mode) {
@@ -299,8 +300,8 @@ export const VIEWER_JS = `
       syncCompareBtn();
       return;
     }
-    if (!FIGMA_URL_RE.test(raw)) {
-      showToast('That doesn\\u2019t look like a figma.com link');
+    if (!FIGMA_URL_RE.test(raw) && !HTTP_URL_RE.test(raw)) {
+      showToast('Paste a figma.com link, or a public fixture JSON URL');
       return;
     }
     pendingFigmaUrl = raw;

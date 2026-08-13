@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -62,10 +62,28 @@ describe("studio upload helpers", () => {
     });
   });
 
-  it("resolveDesignSource rejects a non-figma.com URL", async () => {
+  it("resolveDesignSource rejects a non-figma.com URL that is not fixture JSON", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("not json", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
     await expect(
-      resolveDesignSource({ figmaUrl: "https://evil.example.com/design/x" })
-    ).rejects.toThrow(/figma\.com/);
+      resolveDesignSource({ figmaUrl: "https://example.com/not-a-fixture" })
+    ).rejects.toThrow(/not a Figma fixture JSON/i);
+    vi.unstubAllGlobals();
+  });
+
+  it("resolveDesignSource accepts a public http(s) fixture JSON URL", async () => {
+    const body = { name: "Signup Card", nodes: { "1:2": { document: { id: "1:2", name: "Signup Card" } } } };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await resolveDesignSource({
+      figmaUrl: "https://pookie2006.github.io/figma-verify/design-fixture.json",
+    });
+    expect(result.kind).toBe("fixture");
+    if (result.kind === "fixture") expect(result.fixture.name).toBe("Signup Card");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
   });
 
   it("resolveDesignSource falls back to a valid fixture file", async () => {
