@@ -61,17 +61,18 @@ export function renderHtmlReport(input: HtmlReportInput): string {
       <input type="text" id="fv-code-url" class="inserter-url-input" placeholder="Paste a live URL (http://localhost:3000/...)" hidden aria-label="Live implementation URL" />
       <button type="button" id="fv-code-mode-toggle" class="inserter-mode-toggle" aria-pressed="false" title="Paste a live URL instead of uploading a folder">Link</button>
     </div>
-    <div class="inserter" id="fv-figma-inserter" title="Prefer Link: paste a Figma design/file/proto URL. File upload is a work in progress (fixture JSON still works for offline compares).">
+    <div class="inserter" id="fv-figma-inserter" title="Prefer Link: a figma.com design/file/proto URL, or a fixture JSON URL such as http://127.0.0.1:4174/design-fixture.json. File upload is a work in progress.">
       <label class="inserter-trigger" id="fv-figma-file-trigger">
         <input type="file" id="fv-figma-input" accept=".json,application/json,.png,.jpg,.jpeg,.webp,.svg,image/*" hidden />
         <svg class="inserter-ic" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 9l2-2.5 2 1.5L11 5.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="inserter-kicker">Figma mockup</span>
         <span class="inserter-value" id="fv-figma-value">Choose file…</span>
       </label>
-      <input type="text" id="fv-figma-url" class="inserter-url-input" placeholder="Paste a Figma link, or a public fixture JSON URL" hidden aria-label="Figma link" />
-      <button type="button" id="fv-figma-mode-toggle" class="inserter-mode-toggle" aria-pressed="false" title="Paste a Figma link instead of a file">Link</button>
+      <input type="text" id="fv-figma-url" class="inserter-url-input" placeholder="Figma URL or fixture JSON (http://127.0.0.1:4174/design-fixture.json)" hidden aria-label="Figma or fixture JSON URL" />
+      <button type="button" id="fv-figma-mode-toggle" class="inserter-mode-toggle" aria-pressed="false" title="Paste a Figma URL or a fixture JSON URL instead of a file">Link</button>
       <button type="button" id="fv-figma-save-fixture" class="inserter-mode-toggle" hidden title="Save this Figma link as a local fixture JSON, so future compares don't re-hit the Figma API (helps avoid rate limits)">Save fixture</button>
     </div>
+    <button type="button" id="fv-load-demo" class="demo-btn" title="Fill both Link fields with the bundled Signup Card demo (no Figma token)">Load demo</button>
     <button type="button" id="fv-compare" class="compare-btn" disabled title="Requires the local studio server (npm run studio)">Compare</button>
   </div>
   <div class="meta" id="fv-meta"></div>

@@ -23,16 +23,16 @@ npx playwright install chromium
 npm run studio
 ```
 
-Then open http://127.0.0.1:4174 and paste:
+Then open http://127.0.0.1:4174. Either click **Load demo** (Signup Card, no token), or paste a real Figma link:
 
 | Inserter | Click | Paste |
 |---|---|---|
 | **Code folder** | **Link** | `http://127.0.0.1:4173/` |
-| **Figma mockup** | **Link** | `https://pookie2006.github.io/figma-verify/design-fixture.json` |
+| **Figma mockup** | **Link** | `https://www.figma.com/design/qWrhGNCtP9avcXdYiaBVxE/Buttons-Library--Community-?node-id=1-5` |
 
-`npm run studio` keeps the demo implementation on **port 4173** for as long as the studio is running (the bundled, deliberately flawed Signup Card). The Figma side is a **public fixture JSON** on GitHub Pages — same shape as a Figma nodes-API response, no `FIGMA_TOKEN` and no private Figma file required. Click **Compare**.
+That Figma URL is a public community file ([Buttons Library](https://www.figma.com/design/qWrhGNCtP9avcXdYiaBVxE/Buttons-Library--Community-?node-id=1-5)) — a `figma.com` design link the Link field accepts. Export `FIGMA_TOKEN` in the same terminal before `npm run studio`. The compare against the Signup Card demo will show a lot of drift; that is expected (different designs). Click **Compare**.
 
-A live `figma.com` proto/design URL still works in that same Link field if you have a token and the file is shared with that account.
+For a token-free pair that matches the Signup Card, click **Load demo** instead.
 
 Figma's MCP server pushes design context *into* agents, and agents generate code from it. But nothing closes the loop: no tool lets the agent **verify** that the implementation actually matches the design. Figma Verify closes that loop — the agent implements, verifies, reads the drift report, fixes its code, and re-runs until the fidelity score is 100.
 
